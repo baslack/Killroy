@@ -176,7 +176,7 @@ ktDefaultHolds[ChatSystemLib.ChatChannel_Whisper] = true
 local kcrKillroyEmoteColor = ApolloColor.new('orange')
 local kcrKillroySayColor = ApolloColor.new('white')
 local kcrKillroySayEmoteChar = '*'
-local kcrKillroyEmoteQuoteChar  = '\"'
+local kcrKillroyEmoteQuoteChar  = '"'
 local kcrKillroyEmote = 'emote'
 local kcrKillroySay = 'say'
  
@@ -254,24 +254,66 @@ function Killroy:ParseForContext(strText, eChannelType)
 	]]--
 	
 	local parsedText = {}
+	local pT_idx = 1
 	
 	if eChannelType == ChatSystemLib.ChatChannel_Say then
+		-- match for emotes
 		pattern = '[' .. kcrKillroySayEmoteChar .. '][^' .. kcrKillroySayEmoteChar .. ']*[' .. kcrKillroySayEmoteChar ..']*'
-		for this_segment in string.gmatch(strText, pattern) do
-			if this_segment[0] == KillroySayEmoteChar then
-				parsedText[this_segment] = kcrKillroyEmote
+		
+		index = 1 --start of string
+		length = strText:len()
+		
+		-- if the string has emotes, parse them
+		while strText:find(pattern, index) ~= nil do
+			first, last = strText:find(pattern, index)
+			-- from index, line starts with an emote
+			if first == index then
+				parsedText[pT_idx] = {strText:sub(first, last), kcrKillroyEmote}
+				pT_idx = pT_idx + 1
+				index = last + 1
+			-- from index, line starts with copy
 			else
-				parsedText[this_segment] = kcrKillroySay
-			end
+				parsedText[pT_idx] = {strText:sub(index, (first-1)), kcrKillroySay}
+				pT_idx = pT_idx + 1
+				parsedText[pT_idx] = {strText:sub(first, last), kcrKillroyEmote}
+				index = last + 1
+				pT_idx = pT_idx + 1
+			end			
 		end
-	elseif eChannelType == ChatSystemLib.ChatChanel_Emote then
-		pattern = '[' .. kcrKillroyEmoteQuoteChar .. '][^' .. kcrKillroyQuoteEmoteChar .. ']*[' .. kcrKillroyEmoteQuoteChar ..']*'
-		for this_segment in string.gmatch(strText, pattern) do
-			if this_segment[0] == KillroyEmoteQuteChar then
-				parsedText[this_segment] = kcrKillroySay
+		
+		-- no emotes in string
+		if strText:find(pattern, index) == nil then
+			parsedText[pT_idx] = {strText:sub(index, length), kcrKillroySay}
+		end
+		
+	elseif eChannelType == ChatSystemLib.ChatChannel_Emote then
+		-- match for quotes
+		pattern = '[' .. kcrKillroyEmoteQuoteChar .. '][^' .. kcrKillroyEmoteQuoteChar .. ']*[' .. kcrKillroyEmoteQuoteChar ..']*'
+		
+		index = 1 --start of string
+		length = strText:len()
+		
+		-- if the string has quotes, parse them
+		while strText:find(pattern, index) ~= nil do
+			first, last = strText:find(pattern, index)
+			-- from index, line starts with an quote
+			if first == index then
+				parsedText[pT_idx] = {strText:sub(first, last), kcrKillroySay}
+				pT_idx = pT_idx + 1
+				index = last + 1
+			-- from index, line starts with emote
 			else
-				parsedText[this_segment] = kcrKillroyEmote
-			end
+				parsedText[pT_idx] = {strText:sub(index, (first-1)), kcrKillroyEmote}
+				pT_idx = pT_idx + 1
+				parsedText[pT_idx] = {strText:sub(first, last), kcrKillroySay}
+				index = last + 1
+				pT_idx = pT_idx + 1
+			end			
+		end
+		
+		-- no quotes in string
+		if strText:find(pattern, index) == nil then
+			parsedText[pT_idx] = {strText:sub(index, length), kcrKillroyEmote}
 		end
 	end
 	return parsedText
@@ -503,13 +545,8 @@ function Killroy:Change_ChatLogOnChatMessage()
 				if next(tLink) == nil then
 					-- This is to location to substitute in our replacement for what it sends to chat. bs: 042314
 					xml:AppendText(strText, crChatText, strChatFont)
-					--[[ Testing output of parser
+					--Testing output of parser
 					test = Killroy:ParseForContext(strText, eChannelType)
-					for k,v in pairs(test) do
-						mystring = '\nk:'..k..', v:'..v..'\n'
-						xml:AppendText(mystring, crChatText, strChatFont)
-					end
-					]]--
 				else
 					local strLinkIndex = tostring( self:HelperSaveLink(tLink) )
 					-- append text can only save strings as attributes.
