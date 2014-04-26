@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Addon Author="Benjamin Slack" APIVersion="8" Name="Killroy" Description="Replaces several methods from the default Carbine ChatLog addon to allow for cross faction communication and a more user friendly RP filter experience.">
+    <Script Name="Killroy.lua"/>
+    <Form Name="Killroy.xml"/>
+</Addon>
