@@ -173,12 +173,14 @@ local ktDatacubeTypeStrings =
 local ktDefaultHolds = {}
 ktDefaultHolds[ChatSystemLib.ChatChannel_Whisper] = true
 
-local kcrKillroyEmoteColor = ApolloColor.new('orange')
-local kcrKillroySayColor = ApolloColor.new('white')
+-- local kcrKillroyEmoteColor = ApolloColor.new('orange')
+-- local kcrKillroySayColor = ApolloColor.new('white')
 local kcrKillroySayEmoteChar = '*'
 local kcrKillroyEmoteQuoteChar  = '"'
 local kcrKillroyEmote = 'emote'
 local kcrKillroySay = 'say'
+-- local kcrSayFormat = '<P Font="%s" TextColor="ffffff00">%s</P>'
+-- local kcrEmoteFormat = '<P Font=%s" TextColor="ff990000">%s</P>'
  
 -----------------------------------------------------------------------------------------------
 -- Initialization
@@ -318,7 +320,16 @@ function Killroy:ParseForContext(strText, eChannelType)
 	end
 	return parsedText
 end
-	
+
+function Killroy:DumpToChat(parsedText, strChatFont)
+	for i,t in ipairs(parsedText) do
+		if t[2] == kcrKillroyEmote then
+			xml:AppendText(t[1], kcrKillroyEmoteColor, strChatFont)
+		else
+			xml:AppendText(t[1], kcrKillroySayColor, strChatFont)
+		end
+	end
+end
 
 function Killroy:Change_ChatLogOnChatMessage()
     local aAddon = Apollo.GetAddon("ChatLog")
@@ -544,9 +555,21 @@ function Killroy:Change_ChatLogOnChatMessage()
 	
 				if next(tLink) == nil then
 					-- This is to location to substitute in our replacement for what it sends to chat. bs: 042314
-					xml:AppendText(strText, crChatText, strChatFont)
-					--Testing output of parser
-					test = Killroy:ParseForContext(strText, eChannelType)
+					--xml:AppendText(strText, crChatText, strChatFont) original send to xml line
+					if (eChannelType == ChatSystemLib.ChatChannel_Say) or (eChannelType == ChatSystemLib.ChatChannel_Emote) then
+						parsedText = Killroy:ParseForContext(strText, eChannelType)
+						for i,t in ipairs(parsedText) do
+							if t[2] == 'emote' then
+								--xml:AppendText(t[1], Killroy.kcrKillroyEmoteColor, strChatFont)
+								xml:AppendText(t[1], 'ffff9900', strChatFont)
+							else
+								--xml:AppendText(t[1], Killroy.kcrKillroySayColor, strChatFont)
+								xml:AppendText(t[1], 'ffffffff', strChatFont)
+							end
+						end
+					else
+						xml:AppendText(strText, crChatText, strChatFont)
+					end
 				else
 					local strLinkIndex = tostring( self:HelperSaveLink(tLink) )
 					-- append text can only save strings as attributes.
