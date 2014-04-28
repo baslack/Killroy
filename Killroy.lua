@@ -25,7 +25,7 @@ local Killroy = {}
 -----------------------------------------------------------------------------------------------
 -- e.g. local kiExampleVariableMax = 999
 
-local SCChatLog = {}
+-- local Killroy = {}
 local kcrInvalidColor = ApolloColor.new("InvalidChat")
 local kcrValidColor = ApolloColor.new("white")
 
@@ -173,15 +173,13 @@ local ktDatacubeTypeStrings =
 local ktDefaultHolds = {}
 ktDefaultHolds[ChatSystemLib.ChatChannel_Whisper] = true
 
--- local kcrKillroyEmoteColor = ApolloColor.new('orange')
--- local kcrKillroySayColor = ApolloColor.new('white')
-local kcrKillroySayEmoteChar = '*'
-local kcrKillroyEmoteQuoteChar  = '"'
-local kcrKillroyEmote = 'emote'
-local kcrKillroySay = 'say'
--- local kcrSayFormat = '<P Font="%s" TextColor="ffffff00">%s</P>'
--- local kcrEmoteFormat = '<P Font=%s" TextColor="ff990000">%s</P>'
- 
+local kcrSayEmoteChar = '*'
+local kcrEmoteQuoteChar  = '"'
+local kstrEmote = 'emote'
+local kstrSay = 'say'
+local kstrEmoteColor = 'ffff9900'
+local kstrSayColor = 'ffffffff'
+
 -----------------------------------------------------------------------------------------------
 -- Initialization
 -----------------------------------------------------------------------------------------------
@@ -213,7 +211,8 @@ function Killroy:OnLoad()
 	self.xmlDoc = XmlDoc.CreateFromFile("Killroy.xml")
 	self.xmlDoc:RegisterCallback("OnDocLoaded", self)
 	self:Change_ChatLogOnChatMessage()
-	self:Change_OnRoleplayBtn()
+	--self:Change_OnRoleplayBtn()
+	--self:Change_OnChatInputReturn()
 end
 
 -----------------------------------------------------------------------------------------------
@@ -260,7 +259,7 @@ function Killroy:ParseForContext(strText, eChannelType)
 	
 	if eChannelType == ChatSystemLib.ChatChannel_Say then
 		-- match for emotes
-		pattern = '[' .. kcrKillroySayEmoteChar .. '][^' .. kcrKillroySayEmoteChar .. ']*[' .. kcrKillroySayEmoteChar ..']*'
+		pattern = '[' .. kcrSayEmoteChar .. '][^' .. kcrSayEmoteChar .. ']*[' .. kcrSayEmoteChar ..']*'
 		
 		index = 1 --start of string
 		length = strText:len()
@@ -270,14 +269,14 @@ function Killroy:ParseForContext(strText, eChannelType)
 			first, last = strText:find(pattern, index)
 			-- from index, line starts with an emote
 			if first == index then
-				parsedText[pT_idx] = {strText:sub(first, last), kcrKillroyEmote}
+				parsedText[pT_idx] = {strText:sub(first, last), kstrEmote}
 				pT_idx = pT_idx + 1
 				index = last + 1
 			-- from index, line starts with copy
 			else
-				parsedText[pT_idx] = {strText:sub(index, (first-1)), kcrKillroySay}
+				parsedText[pT_idx] = {strText:sub(index, (first-1)), kstrSay}
 				pT_idx = pT_idx + 1
-				parsedText[pT_idx] = {strText:sub(first, last), kcrKillroyEmote}
+				parsedText[pT_idx] = {strText:sub(first, last), kstrEmote}
 				index = last + 1
 				pT_idx = pT_idx + 1
 			end			
@@ -285,12 +284,12 @@ function Killroy:ParseForContext(strText, eChannelType)
 		
 		-- no emotes in string
 		if strText:find(pattern, index) == nil then
-			parsedText[pT_idx] = {strText:sub(index, length), kcrKillroySay}
+			parsedText[pT_idx] = {strText:sub(index, length), kstrSay}
 		end
 		
 	elseif eChannelType == ChatSystemLib.ChatChannel_Emote then
 		-- match for quotes
-		pattern = '[' .. kcrKillroyEmoteQuoteChar .. '][^' .. kcrKillroyEmoteQuoteChar .. ']*[' .. kcrKillroyEmoteQuoteChar ..']*'
+		pattern = '[' .. kcrEmoteQuoteChar .. '][^' .. kcrEmoteQuoteChar .. ']*[' .. kcrEmoteQuoteChar ..']*'
 		
 		index = 1 --start of string
 		length = strText:len()
@@ -300,14 +299,14 @@ function Killroy:ParseForContext(strText, eChannelType)
 			first, last = strText:find(pattern, index)
 			-- from index, line starts with an quote
 			if first == index then
-				parsedText[pT_idx] = {strText:sub(first, last), kcrKillroySay}
+				parsedText[pT_idx] = {strText:sub(first, last), kstrSay}
 				pT_idx = pT_idx + 1
 				index = last + 1
 			-- from index, line starts with emote
 			else
-				parsedText[pT_idx] = {strText:sub(index, (first-1)), kcrKillroyEmote}
+				parsedText[pT_idx] = {strText:sub(index, (first-1)), kstrEmote}
 				pT_idx = pT_idx + 1
-				parsedText[pT_idx] = {strText:sub(first, last), kcrKillroySay}
+				parsedText[pT_idx] = {strText:sub(first, last), kstrSay}
 				index = last + 1
 				pT_idx = pT_idx + 1
 			end			
@@ -315,20 +314,21 @@ function Killroy:ParseForContext(strText, eChannelType)
 		
 		-- no quotes in string
 		if strText:find(pattern, index) == nil then
-			parsedText[pT_idx] = {strText:sub(index, length), kcrKillroyEmote}
+			parsedText[pT_idx] = {strText:sub(index, length), kstrEmote}
 		end
 	end
 	return parsedText
 end
 
-function Killroy:DumpToChat(parsedText, strChatFont)
+function Killroy:DumpToChat(parsedText, strChatFont, xml)
 	for i,t in ipairs(parsedText) do
-		if t[2] == kcrKillroyEmote then
-			xml:AppendText(t[1], kcrKillroyEmoteColor, strChatFont)
+		if t[2] == kstrEmote then
+			xml:AppendText(t[1], kstrEmoteColor, strChatFont)
 		else
-			xml:AppendText(t[1], kcrKillroySayColor, strChatFont)
+			xml:AppendText(t[1], kstrSayColor, strChatFont)
 		end
 	end
+	return true
 end
 
 function Killroy:Change_ChatLogOnChatMessage()
@@ -498,7 +498,7 @@ function Killroy:Change_ChatLogOnChatMessage()
 					bShow = tSegment.bRolePlay
 				end
 				--[[
-				This original line is commented out to replace with SCChatLog functionality, bs:041214
+				This original line is commented out to replace with Killroy functionality, bs:041214
 				bShow = tSegment.bRolePlay
 				]]--
 			else
@@ -558,15 +558,7 @@ function Killroy:Change_ChatLogOnChatMessage()
 					--xml:AppendText(strText, crChatText, strChatFont) original send to xml line
 					if (eChannelType == ChatSystemLib.ChatChannel_Say) or (eChannelType == ChatSystemLib.ChatChannel_Emote) then
 						parsedText = Killroy:ParseForContext(strText, eChannelType)
-						for i,t in ipairs(parsedText) do
-							if t[2] == 'emote' then
-								--xml:AppendText(t[1], Killroy.kcrKillroyEmoteColor, strChatFont)
-								xml:AppendText(t[1], 'ffff9900', strChatFont)
-							else
-								--xml:AppendText(t[1], Killroy.kcrKillroySayColor, strChatFont)
-								xml:AppendText(t[1], 'ffffffff', strChatFont)
-							end
-						end
+						Killroy:DumpToChat(parsedText, strChatFont, xml)
 					else
 						xml:AppendText(strText, crChatText, strChatFont)
 					end
@@ -576,8 +568,12 @@ function Killroy:Change_ChatLogOnChatMessage()
 					xml:AppendText(strText, crChatText, strChatFont, {strIndex=strLinkIndex} , "Link")
 				end
 	
-	
-				xmlBubble:AppendText(strText, crBubbleText, strBubbleFont) -- Format for bubble; regular
+				if (eChannelType == ChatSystemLib.ChatChannel_Say) or (eChannelType == ChatSystemLib.ChatChannel_Emote) then
+					parsedText = Killroy:ParseForContext(strText, eChannelType)
+					Killroy:DumpToChat(parsedText, strBubbleFont, xmlBubble)
+				else
+					xmlBubble:AppendText(strText, crBubbleText, strBubbleFont) -- Format for bubble; regular
+				end
 				bHasVisibleText = bHasVisibleText or self:HelperCheckForEmptyString(strText)
 			end
 		end
@@ -619,6 +615,70 @@ function Killroy:Change_OnRoleplayBtn()
 	end
 	return true
 end
+
+function Killroy:Change_OnChatInputReturn()
+	local aAddon = Apollo.GetAddon('ChatLog')
+	if aAddon == nil then
+		return false
+	end
+	
+	function aAddon:OnChatInputReturn(wndHandler, wndControl, strText)
+
+		if wndControl:GetName() == "Input" then
+			local wndForm = wndControl:GetParent()
+			strText = self:HelperReplaceLinks(strText, wndControl:GetAllLinks())
+
+			local wndInput = wndForm:FindChild("Input")
+
+			wndControl:SetText("")
+			--[[
+			if self.eRoleplayOption == 2 then
+				wndControl:SetText(Apollo.GetString("ChatLog_RPMarker"))
+			end
+			]]--
+
+			local tChatData = wndForm:GetData()
+			local bViewedChannel = true
+			local tInput = ChatSystemLib.SplitInput(strText)
+			if strText ~= "" and strText ~= Apollo.GetString("ChatLog_RPMarker") and strText ~= Apollo.GetString("ChatLog_Marker") then
+
+				local channelCurrent = tInput.channelCommand or tChatData.channelCurrent
+
+				if channelCurrent:GetType() == ChatSystemLib.ChatChannel_Command then
+					if tInput.bValidCommand then -- good command
+						ChatSystemLib.Command( strText )
+					else	-- bad command
+						local strFailString = String_GetWeaselString(Apollo.GetString("ChatLog_UnknownCommand"), Apollo.GetString("CombatFloaterType_Error"), tInput.strCommand)
+						ChatSystemLib.PostOnChannel( ChatSystemLib.ChatChannel_Command, strFailString, "" )
+						wndInput:SetText(String_GetWeaselString(Apollo.GetString("ChatLog_MessageToPlayer"), tInput.strCommand, tInput.strMessage))
+						wndInput:SetFocus()
+						local strSubmitted = wndForm:FindChild("Input"):GetText()
+						wndInput:SetSel(strSubmitted:len(), -1)
+						return
+					end
+				else
+					tChatData.channelCurrent = channelCurrent
+
+					bViewedChannel = self:VerifyChannelVisibility(channelCurrent, tInput, wndForm)
+				end
+			end
+
+			local crText = self.arChatColor[tChatData.channelCurrent:GetType()] or ApolloColor.new("white")
+			local wndInputType = wndForm:FindChild("InputTypeBtn:InputType")
+			wndForm:GetData().crText = crText
+			wndForm:FindChild("InputTypeBtn:InputType"):SetTextColor(crText)
+			wndInput:SetTextColor(crText)
+			wndInputType:SetText(tChatData.channelCurrent:GetCommand())
+
+			if bViewedChannel ~= true then
+				wndInputType:SetText("X " .. tInput.strCommand)
+				wndInputType:SetTextColor(kcrInvalidColor)
+			end
+		end
+	end
+end
+
+
 
 -----------------------------------------------------------------------------------------------
 -- KillroyForm Functions
