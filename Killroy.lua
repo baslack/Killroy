@@ -85,7 +85,7 @@ local karChannelTypeToColor = -- TODO Merge into one table like this
 	[ChatSystemLib.ChatChannel_AccountWhisper] 	= { Channel = "ChannelAccountWisper", 	},
 }
 
-local ktDefaultChannels =
+local ktDefaultChannels = -- Dont' need this one, doesn't appear in the code you are changing. Togglebutton
 {
 	[ChatSystemLib.ChatChannel_Command] 		= true,
 	[ChatSystemLib.ChatChannel_Debug] 			= true,
@@ -117,7 +117,7 @@ local ktDefaultChannels =
 	[ChatSystemLib.ChatChannel_AccountWhisper]	= true,
 }
 
-local ktChatResultOutputStrings =
+local ktChatResultOutputStrings = -- Dont' need this one, doesn't appear in the code you are changing. Togglebutton
 {
 	[ChatSystemLib.ChatChannelResult_DoesntExist] 			= Apollo.GetString("CRB_Channel_does_not_exist"),
 	[ChatSystemLib.ChatChannelResult_BadPassword] 			= Apollo.GetString("CRB_Channel_password_incorrect"),
@@ -141,7 +141,7 @@ local ktChatResultOutputStrings =
 	[ChatSystemLib.ChatChannelResult_GMMuted]				= Apollo.GetString("ChatLog_MutedByGm"),
 }
 
-local ktChatActionOutputStrings =
+local ktChatActionOutputStrings = -- Dont' need this one, doesn't appear in the code you are changing. Togglebutton
 {
 	[ChatSystemLib.ChatChannelAction_PassOwner] 		= Apollo.GetString("ChatLog_PassedOwnership"),
 	[ChatSystemLib.ChatChannelAction_AddModerator] 		= Apollo.GetString("ChatLog_MadeModerator"),
@@ -153,7 +153,7 @@ local ktChatActionOutputStrings =
 	[ChatSystemLib.ChatChannelAction_RemovePassword] 	= Apollo.GetString("ChatLog_PasswordRemoved")
 }
 
-local ktChatJoinOutputStrings =
+local ktChatJoinOutputStrings = -- Dont' need this one, doesn't appear in the code you are changing. Togglebutton
 {
 	[ChatSystemLib.ChatChannelResult_BadPassword] 			= Apollo.GetString("CRB_Channel_password_incorrect"),
 	[ChatSystemLib.ChatChannelResult_AlreadyMember] 		= Apollo.GetString("ChatLog_AlreadyMember"),
@@ -163,7 +163,7 @@ local ktChatJoinOutputStrings =
 	[ChatSystemLib.ChatChannelResult_TooManyCustomChannels]	= Apollo.GetString("ChatLog_TooManyCustom")
 }
 
-local ktDatacubeTypeStrings =
+local ktDatacubeTypeStrings = -- Dont' need this one, doesn't appear in the code you are changing. Togglebutton
 {
 	[DatacubeLib.DatacubeType_Datacube]						= Apollo.GetString("ChatLog_Datacube"),
 	[DatacubeLib.DatacubeType_Chronicle]					= Apollo.GetString("ChatLog_Chronicle"),
@@ -209,35 +209,13 @@ end
 function Killroy:OnLoad()
     -- load our form file
 	self.xmlDoc = XmlDoc.CreateFromFile("Killroy.xml")
-	self.xmlDoc:RegisterCallback("OnDocLoaded", self)
+	self.wndMain = Apollo.LoadForm(self.xmlDoc, "KillroyForm", nil, self)
+	self.wndMain:Show(false, true)
+	
+	--self.xmlDoc:RegisterCallback("OnDocLoaded", self) -- No need for the callback, forms are not big enough to cause lag. Togglebutton
 	self:Change_ChatLogOnChatMessage()
 	--self:Change_OnRoleplayBtn()
 	--self:Change_OnChatInputReturn()
-end
-
------------------------------------------------------------------------------------------------
--- Killroy OnDocLoaded
------------------------------------------------------------------------------------------------
-function Killroy:OnDocLoaded()
-
-	if self.xmlDoc ~= nil and self.xmlDoc:IsLoaded() then
-	    self.wndMain = Apollo.LoadForm(self.xmlDoc, "KillroyForm", nil, self)
-		if self.wndMain == nil then
-			Apollo.AddAddonErrorText(self, "Could not load the main window for some reason.")
-			return
-		end
-		
-	    self.wndMain:Show(false, true)
-
-		-- if the xmlDoc is no longer needed, you should set it to nil
-		self.xmlDoc = nil
-		
-		-- Register handlers for events, slash commands and timer, etc.
-		-- e.g. Apollo.RegisterEventHandler("KeyDown", "OnKeyDown", self)
-
-
-		-- Do additional Addon initialization here
-	end
 end
 
 -----------------------------------------------------------------------------------------------
@@ -254,9 +232,17 @@ function Killroy:ParseForContext(strText, eChannelType)
 	{{{string},{format}}...}
 	]]--
 	
+	--[[
+		tMessage = {
+			{1, "string"}, -- 1 = say type
+			{2, "string"}, -- 2 = emote (Keep the information small and easy to process. use the same colors for say and emote in each other)
+		}
+	]]
+	
 	local parsedText = {}
 	local pT_idx = 1
 	
+		
 	if eChannelType == ChatSystemLib.ChatChannel_Say then
 		-- match for emotes
 		pattern = '[' .. kcrSayEmoteChar .. '][^' .. kcrSayEmoteChar .. ']*[' .. kcrSayEmoteChar ..']*'
@@ -286,6 +272,12 @@ function Killroy:ParseForContext(strText, eChannelType)
 		if strText:find(pattern, index) == nil then
 			parsedText[pT_idx] = {strText:sub(index, length), kstrSay}
 		end
+		
+		--[[
+			string.gsub(strText,"%b\"\"", function(strSubString) return "</T>"..kstrSayFormat..strSubString.."</T>"..kstrEmote end)
+			
+			-- this should replace the quoted substring with the quoted substring surrounded by the correct XML markup. You don't have to use XmlDoc:AppendText, you can take the formatted text and simply use XmlDoc:AddLine() We just ahve to add the openign and closing tags to strText before setting it.
+		]]
 		
 	elseif eChannelType == ChatSystemLib.ChatChannel_Emote then
 		-- match for quotes
