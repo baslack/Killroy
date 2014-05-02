@@ -85,91 +85,6 @@ local karChannelTypeToColor = -- TODO Merge into one table like this
 	[ChatSystemLib.ChatChannel_AccountWhisper] 	= { Channel = "ChannelAccountWisper", 	},
 }
 
-local ktDefaultChannels = -- Dont' need this one, doesn't appear in the code you are changing. Togglebutton
-{
-	[ChatSystemLib.ChatChannel_Command] 		= true,
-	[ChatSystemLib.ChatChannel_Debug] 			= true,
-	[ChatSystemLib.ChatChannel_Say] 			= true,
-	[ChatSystemLib.ChatChannel_Yell] 			= true,
-	[ChatSystemLib.ChatChannel_Whisper] 		= true,
-	[ChatSystemLib.ChatChannel_Party] 			= true,
-	[ChatSystemLib.ChatChannel_Emote] 			= true,
-	[ChatSystemLib.ChatChannel_AnimatedEmote] 	= true,
-	[ChatSystemLib.ChatChannel_Zone]			= true,
-	[ChatSystemLib.ChatChannel_ZonePvP] 		= true,
-	[ChatSystemLib.ChatChannel_Trade] 			= true,
-	[ChatSystemLib.ChatChannel_Guild] 			= true,
-	[ChatSystemLib.ChatChannel_GuildOfficer] 	= true,
-	[ChatSystemLib.ChatChannel_WarParty] 		= true,
-	[ChatSystemLib.ChatChannel_WarPartyOfficer] = true,
-	[ChatSystemLib.ChatChannel_Society] 		= true,
-	[ChatSystemLib.ChatChannel_Custom] 			= true,
-	[ChatSystemLib.ChatChannel_NPCSay] 			= true,
-	[ChatSystemLib.ChatChannel_NPCYell] 		= true,
-	[ChatSystemLib.ChatChannel_NPCWhisper] 		= true,
-	[ChatSystemLib.ChatChannel_Datachron] 		= true,
-	[ChatSystemLib.ChatChannel_Realm] 			= true,
-	[ChatSystemLib.ChatChannel_Loot] 			= true,
-	[ChatSystemLib.ChatChannel_System] 			= true,
-	[ChatSystemLib.ChatChannel_PlayerPath] 		= true,
-	[ChatSystemLib.ChatChannel_Instance] 		= true,
-	[ChatSystemLib.ChatChannel_Advice] 			= true,
-	[ChatSystemLib.ChatChannel_AccountWhisper]	= true,
-}
-
-local ktChatResultOutputStrings = -- Dont' need this one, doesn't appear in the code you are changing. Togglebutton
-{
-	[ChatSystemLib.ChatChannelResult_DoesntExist] 			= Apollo.GetString("CRB_Channel_does_not_exist"),
-	[ChatSystemLib.ChatChannelResult_BadPassword] 			= Apollo.GetString("CRB_Channel_password_incorrect"),
-	[ChatSystemLib.ChatChannelResult_NoPermissions] 		= Apollo.GetString("CRB_Channel_no_permissions"),
-	[ChatSystemLib.ChatChannelResult_NoSpeaking] 			= Apollo.GetString("CRB_Channel_no_speaking"),
-	[ChatSystemLib.ChatChannelResult_Muted] 				= Apollo.GetString("CRB_Channel_muted"),
-	[ChatSystemLib.ChatChannelResult_Throttled] 			= Apollo.GetString("CRB_Channel_throttled"),
-	[ChatSystemLib.ChatChannelResult_NotInGroup] 			= Apollo.GetString("CRB_Not_in_group"),
-	[ChatSystemLib.ChatChannelResult_NotInGuild] 			= Apollo.GetString("CRB_Channel_not_in_guild"),
-	[ChatSystemLib.ChatChannelResult_NotInSociety] 			= Apollo.GetString("CRB_Channel_not_in_society"),
-	[ChatSystemLib.ChatChannelResult_NotGuildOfficer] 		= Apollo.GetString("CRB_Channel_not_guild_officer"),
-	[ChatSystemLib.ChatChannelResult_AlreadyMember] 		= Apollo.GetString("ChatLog_AlreadyInChannel"),
-	[ChatSystemLib.ChatChannelResult_BadName] 				= Apollo.GetString("ChatLog_InvalidChannel"),
-	[ChatSystemLib.ChatChannelResult_NotMember] 			= Apollo.GetString("ChatLog_TargetNotInChannel"),
-	[ChatSystemLib.ChatChannelResult_NotInWarParty] 		= Apollo.GetString("ChatLog_NotInWarparty"),
-	[ChatSystemLib.ChatChannelResult_NotWarPartyOfficer] 	= Apollo.GetString("ChatLog_NotWarpartyOfficer"),
-	[ChatSystemLib.ChatChannelResult_InvalidMessageText] 	= Apollo.GetString("ChatLog_InvalidMessage"),
-	[ChatSystemLib.ChatChannelResult_InvalidPasswordText] 	= Apollo.GetString("ChatLog_UseDifferentPassword"),
-	[ChatSystemLib.ChatChannelResult_TruncatedText]			= Apollo.GetString("ChatLog_MessageTruncated"),
-	[ChatSystemLib.ChatChannelResult_InvalidCharacterName]	= Apollo.GetString("ChatLog_InvalidCharacterName"),
-	[ChatSystemLib.ChatChannelResult_GMMuted]				= Apollo.GetString("ChatLog_MutedByGm"),
-}
-
-local ktChatActionOutputStrings = -- Dont' need this one, doesn't appear in the code you are changing. Togglebutton
-{
-	[ChatSystemLib.ChatChannelAction_PassOwner] 		= Apollo.GetString("ChatLog_PassedOwnership"),
-	[ChatSystemLib.ChatChannelAction_AddModerator] 		= Apollo.GetString("ChatLog_MadeModerator"),
-	[ChatSystemLib.ChatChannelAction_RemoveModerator] 	= Apollo.GetString("ChatLog_MadeMember"),
-	[ChatSystemLib.ChatChannelAction_Muted] 			= Apollo.GetString("ChatLog_PlayerMuted"),
-	[ChatSystemLib.ChatChannelAction_Unmuted] 			= Apollo.GetString("ChatLog_PlayerUnmuted"),
-	[ChatSystemLib.ChatChannelAction_Kicked] 			= Apollo.GetString("ChatLog_PlayerKicked"),
-	[ChatSystemLib.ChatChannelAction_AddPassword] 		= Apollo.GetString("ChatLog_PasswordAdded"),
-	[ChatSystemLib.ChatChannelAction_RemovePassword] 	= Apollo.GetString("ChatLog_PasswordRemoved")
-}
-
-local ktChatJoinOutputStrings = -- Dont' need this one, doesn't appear in the code you are changing. Togglebutton
-{
-	[ChatSystemLib.ChatChannelResult_BadPassword] 			= Apollo.GetString("CRB_Channel_password_incorrect"),
-	[ChatSystemLib.ChatChannelResult_AlreadyMember] 		= Apollo.GetString("ChatLog_AlreadyMember"),
-	[ChatSystemLib.ChatChannelResult_BadName]				= Apollo.GetString("ChatLog_BadName"),
-	[ChatSystemLib.ChatChannelResult_InvalidPasswordText] 	= Apollo.GetString("ChatLog_InvalidPasswordText"),
-	[ChatSystemLib.ChatChannelResult_NoPermissions] 		= Apollo.GetString("CRB_Channel_no_permissions"),
-	[ChatSystemLib.ChatChannelResult_TooManyCustomChannels]	= Apollo.GetString("ChatLog_TooManyCustom")
-}
-
-local ktDatacubeTypeStrings = -- Dont' need this one, doesn't appear in the code you are changing. Togglebutton
-{
-	[DatacubeLib.DatacubeType_Datacube]						= Apollo.GetString("ChatLog_Datacube"),
-	[DatacubeLib.DatacubeType_Chronicle]					= Apollo.GetString("ChatLog_Chronicle"),
-	[DatacubeLib.DatacubeType_Journal]						= Apollo.GetString("ChatLog_Journal")
-}
-
 local ktDefaultHolds = {}
 ktDefaultHolds[ChatSystemLib.ChatChannel_Whisper] = true
 
@@ -213,7 +128,9 @@ function Killroy:OnLoad()
 	self.wndMain:Show(false, true)
 	
 	--self.xmlDoc:RegisterCallback("OnDocLoaded", self) -- No need for the callback, forms are not big enough to cause lag. Togglebutton
-	self:Change_ChatLogOnChatMessage()
+	--bs: 050214, they moved the filtering out of OnChatMessage and into a new method called HelperGenerateChatMessage
+	self:Change_HelperGenerateChatMessage()
+	--self:Change_ChatLogOnChatMessage()
 	--self:Change_OnRoleplayBtn()
 	--self:Change_OnChatInputReturn()
 end
@@ -479,6 +396,8 @@ function Killroy:Change_ChatLogOnChatMessage()
 			if self.eRoleplayOption == 3 then
 				bShow = not tSegment.bRolePlay
 			elseif self.eRoleplayOption == 2 then
+				-- bs:050214, block below legacy for possible fix later, see method Apollo.ParseInput(strText)
+				--[[
 				-- Force say and emote to IC
 				if eChannelType == ChatSystemLib.ChatChannel_Say or eChannelType == ChatSystemLib.ChatChannel_Emote then
 					tSegment.bRolePlay = true
@@ -489,10 +408,9 @@ function Killroy:Change_ChatLogOnChatMessage()
 				else
 					bShow = tSegment.bRolePlay
 				end
-				--[[
-				This original line is commented out to replace with Killroy functionality, bs:041214
-				bShow = tSegment.bRolePlay
 				]]--
+				-- bs:050214, Restored original functionality due to the issue with being unable to catch input string presend
+				bShow = tSegment.bRolePlay
 			else
 				bShow = true;
 			end
@@ -580,6 +498,245 @@ function Killroy:Change_ChatLogOnChatMessage()
 	end
 	return true
 end
+
+function Killroy:Change_HelperGenerateChatMessage()
+	local aAddon = Apollo.GetAddon("ChatLog")
+	if aAddon == nil then
+		return false
+	end
+	
+	function aAddon:HelperGenerateChatMessage(tQueuedMessage)
+		if tQueuedMessage.xml then
+			return
+		end
+
+		local eChannelType = tQueuedMessage.eChannelType
+		local tMessage = tQueuedMessage.tMessage
+
+		-- Different handling for combat log
+		if eChannelType == ChatSystemLib.ChatChannel_Combat then
+			-- no formats in combat, roll it all up into one.
+			local strMessage = ""
+			for idx, tSegment in ipairs(tMessage.arMessageSegments) do
+				strMessage = strMessage .. tSegment.strText
+			end
+			tQueuedMessage.strMessage = strMessage
+			return
+		end
+
+		local xml = XmlDoc.new()
+		local tm = GameLib.GetLocalTime()
+		local crText = self.arChatColor[eChannelType] or ApolloColor.new("white")
+		local crChannel = ApolloColor.new(karChannelTypeToColor[eChannelType].Channel or "white")
+		local crPlayerName = ApolloColor.new("ChatPlayerName")
+
+		local strTime = "" if self.bShowTimestamp then strTime = string.format("%d:%02d ", tm.nHour, tm.nMinute) end
+		local strWhisperName = tMessage.strSender
+		if tMessage.strRealmName:len() > 0 then
+			-- Name/Realm formatting needs to be very specific for cross realm chat to work
+			strWhisperName = strWhisperName .. "@" .. tMessage.strRealmName
+		end
+
+		--strWhisperName must only be sender@realm, or friends equivelent name.
+
+		local strPresenceState = ""
+		if tMessage.bAutoResponse then
+			strPresenceState = '('..Apollo.GetString("AutoResponse_Prefix")..')'
+		end
+
+		if tMessage.nPresenceState == FriendshipLib.AccountPresenceState_Away then
+			strPresenceState = '<'..Apollo.GetString("Command_Friendship_AwayFromKeyboard")..'>'
+		elseif tMessage.nPresenceState == FriendshipLib.AccountPresenceState_Busy then
+			strPresenceState = '<'..Apollo.GetString("Command_Friendship_DoNotDisturb")..'>'
+		end
+
+		if eChannelType == ChatSystemLib.ChatChannel_Whisper then
+			if not tMessage.bSelf then
+				self.tLastWhisperer = { strCharacterName = strWhisperName, eChannelType = ChatSystemLib.ChatChannel_Whisper }--record the last incoming whisperer for quick response
+			end
+			Sound.Play(Sound.PlayUISocialWhisper)
+		elseif eChannelType == ChatSystemLib.ChatChannel_AccountWhisper then
+
+			local tPreviousWhisperer = self.tLastWhisperer
+
+			self.tLastWhisperer =
+			{
+				strCharacterName = tMessage.strSender,
+				strRealmName = nil,
+				strDisplayName = nil,
+				eChannelType = ChatSystemLib.ChatChannel_AccountWhisper
+			}
+
+			local tAccountFriends = FriendshipLib.GetAccountList()
+			for idx, tAccountFriend in pairs(tAccountFriends) do
+				if tAccountFriend.arCharacters ~= nil then
+					for idx, tCharacter in pairs(tAccountFriend.arCharacters) do
+						if tCharacter.strCharacterName == tMessage.strSender and (tMessage.strRealmName:len() == 0 or tCharacter.strRealm == tMessage.strRealmName) then
+							if not tMessage.bSelf or (tPreviousWhisperer and tPreviousWhisperer.strCharacterName == tMessage.strSender) then
+								self.tLastWhisperer.strDisplayName = tAccountFriend.strCharacterName
+								self.tLastWhisperer.strRealmName = tCharacter.strRealm
+							end
+							strWhisperName = tAccountFriend.strCharacterName
+							if tMessage.strRealmName:len() > 0 then
+								-- Name/Realm formatting needs to be very specific for cross realm chat to work
+								strWhisperName = strWhisperName .. "@" .. tMessage.strRealmName
+							end
+						end
+					end
+				end
+			end
+			Sound.Play(Sound.PlayUISocialWhisper)
+		end
+
+		-- We build strings backwards, right to left
+		if eChannelType == ChatSystemLib.ChatChannel_AnimatedEmote then -- emote animated channel gets special formatting
+			xml:AddLine(strTime, crChannel, self.strFontOption, "Left")
+
+		elseif eChannelType == ChatSystemLib.ChatChannel_Emote then -- emote channel gets special formatting
+			xml:AddLine(strTime, crChannel, self.strFontOption, "Left")
+			if strWhisperName:len() > 0 then
+				if tMessage.bGM then
+					xml:AppendImage(kstrGMIcon, 16, 16)
+				end
+				xml:AppendText(strWhisperName, crPlayerName, self.strFontOption, {CharacterName=strWhisperName, nReportId=tMessage.nReportId}, "Source")
+			end
+			xml:AppendText(" ")
+		else
+			local strChannel
+			if eChannelType == ChatSystemLib.ChatChannel_Society then
+				strChannel = String_GetWeaselString(Apollo.GetString("ChatLog_GuildCommand"), tQueuedMessage.strChannelName, tQueuedMessage.strChannelCommand)
+			else
+				strChannel = String_GetWeaselString(Apollo.GetString("CRB_Brackets_Space"), tQueuedMessage.strChannelName)
+			end
+
+			if self.bShowChannel ~= true then
+				strChannel = ""
+			end
+
+			xml:AddLine(strTime .. strChannel, crChannel, self.strFontOption, "Left")
+			if strWhisperName:len() > 0 then
+
+				local strWhisperNamePrefix = ""
+				if eChannelType == ChatSystemLib.ChatChannel_Whisper or eChannelType == ChatSystemLib.ChatChannel_AccountWhisper then
+					if tMessage.bSelf then
+						strWhisperNamePrefix = Apollo.GetString("ChatLog_To")
+					else
+						strWhisperNamePrefix = Apollo.GetString("ChatLog_From")
+					end
+				end
+
+				xml:AppendText( strWhisperNamePrefix, crText, self.strFontOption)
+
+				if tMessage.bGM then
+					xml:AppendImage(kstrGMIcon, 16, 16)
+				end
+
+				xml:AppendText( strWhisperName, crPlayerName, self.strFontOption, {CharacterName=strWhisperName, nReportId=tMessage.nReportId}, "Source")
+			end
+			xml:AppendText( strPresenceState .. ": ", crChannel, self.strFontOption, "Left")
+		end
+
+		local xmlBubble = nil
+		if tMessage.bShowChatBubble then
+			xmlBubble = XmlDoc.new() -- This is the speech bubble form
+			xmlBubble:AddLine("", crChannel, self.strFontOption, "Center")
+		end
+
+		local bHasVisibleText = false
+		for idx, tSegment in ipairs( tMessage.arMessageSegments ) do
+			local strText = tSegment.strText
+			local bAlien = tSegment.bAlien --or tMessage.bCrossFaction, bs:050214 Disabling Cross faction filter
+			local bShow = false
+
+			if self.eRoleplayOption == 3 then
+				bShow = not tSegment.bRolePlay
+			elseif self.eRoleplayOption == 2 then
+				bShow = tSegment.bRolePlay
+			else
+				bShow = true;
+			end
+
+			if bShow then
+				local crChatText = crText;
+				local crBubbleText = kstrColorChatRegular
+				local strChatFont = self.strFontOption
+				local strBubbleFont = kstrBubbleFont
+				local tLink = {}
+
+
+				if tSegment.uItem ~= nil then -- item link
+					-- replace me with correct colors
+					strText = String_GetWeaselString(Apollo.GetString("CRB_Brackets"), tSegment.uItem:GetName())
+					crChatText = karEvalColors[tSegment.uItem:GetItemQuality()]
+					crBubbleText = ApolloColor.new("white")
+
+					tLink.strText = strText
+					tLink.uItem = tSegment.uItem
+
+				elseif tSegment.uQuest ~= nil then -- quest link
+					-- replace me with correct colors
+					strText = String_GetWeaselString(Apollo.GetString("CRB_Brackets"), tSegment.uQuest:GetTitle())
+					crChatText = ApolloColor.new("green")
+					crBubbleText = ApolloColor.new("green")
+
+					tLink.strText = strText
+					tLink.uQuest = tSegment.uQuest
+
+				elseif tSegment.uArchiveArticle ~= nil then -- archive article
+					-- replace me with correct colors
+					strText = String_GetWeaselString(Apollo.GetString("CRB_Brackets"), tSegment.uArchiveArticle:GetTitle())
+					crChatText = ApolloColor.new("cyan")
+					crBubbleText = ApolloColor.new("cyan")
+
+					tLink.strText = strText
+					tLink.uArchiveArticle = tSegment.uArchiveArticle
+
+				else
+					if tSegment.bRolePlay then
+						crBubbleText = kstrColorChatRoleplay
+						strChatFont = self.strRPFontOption
+						strBubbleFont = kstrDialogFontRP
+					end
+
+					if bAlien or tSegment.bProfanity then -- Weak filter. Note only profanity is scrambled.
+						strChatFont = self.strAlienFontOption
+						strBubbleFont = self.strAlienFontOption
+					end
+				end
+
+				if next(tLink) == nil then
+					--xml:AppendText(strText, crChatText, strChatFont) original send to xml line
+					if (eChannelType == ChatSystemLib.ChatChannel_Say) or (eChannelType == ChatSystemLib.ChatChannel_Emote) then
+						parsedText = Killroy:ParseForContext(strText, eChannelType)
+						Killroy:DumpToChat(parsedText, strChatFont, xml)
+					else
+						xml:AppendText(strText, crChatText, strChatFont)
+					end
+					--bs:050214, 
+					--xml:AppendText(strText, crChatText, strChatFont)
+				else
+					local strLinkIndex = tostring( self:HelperSaveLink(tLink) )
+					-- append text can only save strings as attributes.
+					xml:AppendText(strText, crChatText, strChatFont, {strIndex=strLinkIndex} , "Link")
+				end
+
+				if xmlBubble then
+					xmlBubble:AppendText(strText, crBubbleText, strBubbleFont) -- Format for bubble; regular
+				end
+
+				bHasVisibleText = bHasVisibleText or self:HelperCheckForEmptyString(strText)
+			end
+		end
+
+		tQueuedMessage.bHasVisibleText = bHasVisibleText
+		tQueuedMessage.xml = xml
+		tQueuedMessage.xmlBubble = xmlBubble
+	end
+	
+	return true
+
+end
+
 
 function Killroy:Change_OnRoleplayBtn()
     local aAddon = Apollo.GetAddon("ChatLog")
