@@ -327,10 +327,15 @@ function Killroy:Change_HelperGenerateChatMessage()
 
 		-- We build strings backwards, right to left
 		if eChannelType == ChatSystemLib.ChatChannel_AnimatedEmote then -- emote animated channel gets special formatting
-			xml:AddLine(strTime, crChannel, self.strFontOption, "Left")
+			
+			xml:AddLine(strTime, kstrEmoteColor, self.strFontOption, "Left")
+			--bs: 050314, changing animated emotes to match the emote color
+			--xml:AddLine(strTime, crChannel, self.strFontOption, "Left")
 
 		elseif eChannelType == ChatSystemLib.ChatChannel_Emote then -- emote channel gets special formatting
-			xml:AddLine(strTime, crChannel, self.strFontOption, "Left")
+			xml:AddLine(strTime, kstrEmoteColor, self.strFontOption, "Left")
+			--bs:050314, making emotes match what Killroy states they should be
+			--xml:AddLine(strTime, crChannel, self.strFontOption, "Left")
 			if strWhisperName:len() > 0 then
 				if tMessage.bGM then
 					xml:AppendImage(kstrGMIcon, 16, 16)
@@ -446,6 +451,8 @@ function Killroy:Change_HelperGenerateChatMessage()
 					if (eChannelType == ChatSystemLib.ChatChannel_Say) or (eChannelType == ChatSystemLib.ChatChannel_Emote) then
 						parsedText = Killroy:ParseForContext(strText, eChannelType)
 						Killroy:DumpToChat(parsedText, strChatFont, xml)
+					elseif (eChannelType == ChatSystemLib.ChatChannel_AnimatedEmote) then
+						xml:AppendText(strText, kstrEmoteColor, strChatFont)
 					else
 						xml:AppendText(strText, crChatText, strChatFont)
 					end
