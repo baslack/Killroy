@@ -25,7 +25,6 @@ local Killroy = {}
 -----------------------------------------------------------------------------------------------
 -- e.g. local kiExampleVariableMax = 999
 
--- local Killroy = {}
 local kcrInvalidColor = ApolloColor.new("InvalidChat")
 local kcrValidColor = ApolloColor.new("white")
 
@@ -94,6 +93,8 @@ local kstrEmote = 'emote'
 local kstrSay = 'say'
 local kstrEmoteColor = 'ffff9900'
 local kstrSayColor = 'ffffffff'
+local kstrEmFormat = '<T TextColor="' .. kstrEmoteColor ..'">'
+local kstrSayFormat = '<T TextColor="' .. kstrSayColor ..'">'
 
 -----------------------------------------------------------------------------------------------
 -- Initialization
@@ -127,12 +128,8 @@ function Killroy:OnLoad()
 	self.wndMain = Apollo.LoadForm(self.xmlDoc, "KillroyForm", nil, self)
 	self.wndMain:Show(false, true)
 	
-	--self.xmlDoc:RegisterCallback("OnDocLoaded", self) -- No need for the callback, forms are not big enough to cause lag. Togglebutton
 	--bs: 050214, they moved the filtering out of OnChatMessage and into a new method called HelperGenerateChatMessage
 	self:Change_HelperGenerateChatMessage()
-	--self:Change_ChatLogOnChatMessage()
-	--self:Change_OnRoleplayBtn()
-	--self:Change_OnChatInputReturn()
 end
 
 -----------------------------------------------------------------------------------------------
@@ -140,14 +137,8 @@ end
 -----------------------------------------------------------------------------------------------
 -- Define general functions here
 
-function Killroy:ParseForContext(strText, eChannelType)
-	--[[
-	This function will take incoming text and do the following:
-	if SAY chat it will look for '*' and segment the string into sub-strings
-	if EMOTE chat it will look for '"' and segment the string into substrings
-	create an indexed table that will contain a sub-table formated thus:
-	{{{string},{format}}...}
-	]]--
+function Killroy:ParseForContext(strText, strChatFont, eChannelType)
+
 	
 	--[[
 		tMessage = {
@@ -156,347 +147,29 @@ function Killroy:ParseForContext(strText, eChannelType)
 		}
 	]]
 	
-	local parsedText = {}
-	local pT_idx = 1
-	
+	--[[
+		string.gsub(strText,"%b\"\"", function(strSubString) return "</T>"..kstrSayFormat..strSubString.."</T>"..kstrEmote end)
 		
+		-- this should replace the quoted substring with the quoted substring surrounded by the correct XML markup. You don't have to use XmlDoc:AppendText, you can take the formatted text and simply use XmlDoc:AddLine() We just ahve to add the openign and closing tags to strText before setting it.
+	]]--
+
+	local parsedText = ''
+			
 	if eChannelType == ChatSystemLib.ChatChannel_Say then
 		-- match for emotes
-		pattern = '[' .. kcrSayEmoteChar .. '][^' .. kcrSayEmoteChar .. ']*[' .. kcrSayEmoteChar ..']*'
-		
-		index = 1 --start of string
-		length = strText:len()
-		
-		-- if the string has emotes, parse them
-		while strText:find(pattern, index) ~= nil do
-			first, last = strText:find(pattern, index)
-			-- from index, line starts with an emote
-			if first == index then
-				parsedText[pT_idx] = {strText:sub(first, last), kstrEmote}
-				pT_idx = pT_idx + 1
-				index = last + 1
-			-- from index, line starts with copy
-			else
-				parsedText[pT_idx] = {strText:sub(index, (first-1)), kstrSay}
-				pT_idx = pT_idx + 1
-				parsedText[pT_idx] = {strText:sub(first, last), kstrEmote}
-				index = last + 1
-				pT_idx = pT_idx + 1
-			end			
-		end
-		
-		-- no emotes in string
-		if strText:find(pattern, index) == nil then
-			parsedText[pT_idx] = {strText:sub(index, length), kstrSay}
-		end
-		
-		--[[
-			string.gsub(strText,"%b\"\"", function(strSubString) return "</T>"..kstrSayFormat..strSubString.."</T>"..kstrEmote end)
-			
-			-- this should replace the quoted substring with the quoted substring surrounded by the correct XML markup. You don't have to use XmlDoc:AppendText, you can take the formatted text and simply use XmlDoc:AddLine() We just ahve to add the openign and closing tags to strText before setting it.
-		]]
-		
+		parsedText = string.gsub(strText,'%b**', function(strSubString) return '</T>'..kstrEmFormat..strSubString..'</T>'..kstrSayFormat end)
+		parsedText = '<T Font="'..strChatFont..'" TextColor = "'..kstrSayColor..'">'..parsedText..'</T>'
+
 	elseif eChannelType == ChatSystemLib.ChatChannel_Emote then
 		-- match for quotes
-		pattern = '[' .. kcrEmoteQuoteChar .. '][^' .. kcrEmoteQuoteChar .. ']*[' .. kcrEmoteQuoteChar ..']*'
-		
-		index = 1 --start of string
-		length = strText:len()
-		
-		-- if the string has quotes, parse them
-		while strText:find(pattern, index) ~= nil do
-			first, last = strText:find(pattern, index)
-			-- from index, line starts with an quote
-			if first == index then
-				parsedText[pT_idx] = {strText:sub(first, last), kstrSay}
-				pT_idx = pT_idx + 1
-				index = last + 1
-			-- from index, line starts with emote
-			else
-				parsedText[pT_idx] = {strText:sub(index, (first-1)), kstrEmote}
-				pT_idx = pT_idx + 1
-				parsedText[pT_idx] = {strText:sub(first, last), kstrSay}
-				index = last + 1
-				pT_idx = pT_idx + 1
-			end			
-		end
-		
-		-- no quotes in string
-		if strText:find(pattern, index) == nil then
-			parsedText[pT_idx] = {strText:sub(index, length), kstrEmote}
-		end
+		parsedText = string.gsub(strText,'%b""', function(strSubString) return '</T>'..kstrSayFormat..strSubString..'</T>'..kstrEmFormat end)
+		parsedText = '<T Font="'..strChatFont..'" TextColor = "'..kstrEmoteColor..'">'..parsedText..'</T>'
+	else
+		parsedText = nil
 	end
+	
 	return parsedText
-end
-
-function Killroy:DumpToChat(parsedText, strChatFont, xml)
-	for i,t in ipairs(parsedText) do
-		if t[2] == kstrEmote then
-			xml:AppendText(t[1], kstrEmoteColor, strChatFont)
-		else
-			xml:AppendText(t[1], kstrSayColor, strChatFont)
-		end
-	end
-	return true
-end
-
-function Killroy:Change_ChatLogOnChatMessage()
-    local aAddon = Apollo.GetAddon("ChatLog")
-    if aAddon == nil then
-        return false
-    end
-    
-	function aAddon:OnChatMessage(channelCurrent, tMessage)
-		-- tMessage has bAutoResponse, bGM, bSelf, strSender, strRealmName, nPresenceState, arMessageSegments, unitSource, bShowChatBubble, bCrossFaction, nReportId
 	
-		-- arMessageSegments is an array of tables.  Each table representsa part of the message + the formatting for that segment.
-		-- This allows us to signal font (alien text for example) changes mid stream.
-		-- local example = arMessageSegments[1]
-		-- example.strText is the text
-		-- example.bAlien == true if alien font set
-		-- example.bRolePlay == true if this is rolePlay Text.  RolePlay text should only show up for people in roleplay mode, and non roleplay text should only show up for people outside it.
-	
-		-- to use: 	{#}toggles alien on {*}toggles rp on. Alien is still on {!}resets all format codes.
-	
-		
-		local eChannelType = channelCurrent:GetType()
-	
-		-- Different handling for combat log
-		if eChannelType == ChatSystemLib.ChatChannel_Combat then
-			-- no formats in combat, roll it all up into one.
-			local strMessage = ""
-			for idx, tSegment in ipairs(tMessage.arMessageSegments) do
-				strMessage = strMessage .. tSegment.strText
-			end
-			self:QueueAChatLine(strMessage, eChannelType)
-			return
-		end
-	
-	
-		local xml = XmlDoc.new()
-		local tm = GameLib.GetLocalTime()
-		local crText = self.arChatColor[eChannelType] or ApolloColor.new("white")
-		local crChannel = ApolloColor.new(karChannelTypeToColor[eChannelType].Channel or "white")
-		local crPlayerName = ApolloColor.new("ChatPlayerName")
-	
-		local strTime = "" if self.bShowTimestamp then strTime = string.format("%d:%02d ", tm.nHour, tm.nMinute) end
-		local strWhisperName = tMessage.strSender
-		if tMessage.strRealmName:len() > 0 then
-			-- Name/Realm formatting needs to be very specific for cross realm chat to work
-			strWhisperName = strWhisperName .. "@" .. tMessage.strRealmName
-		end
-	
-		--strWhisperName must only be sender@realm, or friends equivelent name.
-	
-		local strPresenceState = ""
-		if tMessage.bAutoResponse then
-			strPresenceState = '('..Apollo.GetString("AutoResponse_Prefix")..')'
-		end
-	
-		if tMessage.nPresenceState == FriendshipLib.AccountPresenceState_Away then
-			strPresenceState = '<'..Apollo.GetString("Command_Friendship_AwayFromKeyboard")..'>'
-		elseif tMessage.nPresenceState == FriendshipLib.AccountPresenceState_Busy then
-			strPresenceState = '<'..Apollo.GetString("Command_Friendship_DoNotDisturb")..'>'
-		end
-	
-		if eChannelType == ChatSystemLib.ChatChannel_Whisper then
-			if not tMessage.bSelf then
-				self.tLastWhisperer = { strCharacterName = strWhisperName, eChannelType = ChatSystemLib.ChatChannel_Whisper }--record the last incoming whisperer for quick response
-			end
-		elseif eChannelType == ChatSystemLib.ChatChannel_AccountWhisper then
-			self.tLastWhisperer =
-			{
-				strCharacterName = tMessage.strSender,
-				strRealmName = nil,
-				strDisplayName = nil,
-				eChannelType = ChatSystemLib.ChatChannel_AccountWhisper
-			}
-	
-			local tAccountFriends = FriendshipLib.GetAccountList()
-			for idx, tAccountFriend in pairs(tAccountFriends) do
-				if tAccountFriend.arCharacters ~= nil then
-					for idx, tCharacter in pairs(tAccountFriend.arCharacters) do
-						if tCharacter.strCharacterName == tMessage.strSender and (tMessage.strRealmName:len() == 0 or tCharacter.strRealm == tMessage.strRealmName) then
-							if not tMessage.bSelf then
-								self.tLastWhisperer.strDisplayName = tAccountFriend.strCharacterName
-								self.tLastWhisperer.strRealmName = tCharacter.strRealm
-							end
-							strWhisperName = tAccountFriend.strCharacterName
-							if tMessage.strRealmName:len() > 0 then
-								-- Name/Realm formatting needs to be very specific for cross realm chat to work
-								strWhisperName = strWhisperName .. "@" .. tMessage.strRealmName
-							end
-						end
-					end
-				end
-			end
-	
-		end
-	
-		-- We build strings backwards, right to left
-		if eChannelType == ChatSystemLib.ChatChannel_AnimatedEmote then -- emote animated channel gets special formatting
-			xml:AddLine(strTime, crChannel, self.strFontOption, "Left")
-	
-		elseif eChannelType == ChatSystemLib.ChatChannel_Emote then -- emote channel gets special formatting
-			xml:AddLine(strTime, crChannel, self.strFontOption, "Left")
-			if strWhisperName:len() > 0 then
-				if tMessage.bGM then
-					xml:AppendImage(kstrGMIcon, 16, 16)
-				end
-				xml:AppendText(strWhisperName, crPlayerName, self.strFontOption, {CharacterName=strWhisperName, nReportId=tMessage.nReportId}, "Source")
-			end
-			xml:AppendText(" ")
-		else
-			local strChannel
-			if eChannelType == ChatSystemLib.ChatChannel_Society then
-				strChannel = String_GetWeaselString(Apollo.GetString("ChatLog_GuildCommand"), channelCurrent:GetName(), channelCurrent:GetCommand())
-			else
-				strChannel = String_GetWeaselString(Apollo.GetString("CRB_Brackets_Space"), channelCurrent:GetName())
-			end
-	
-			if self.bShowChannel ~= true then
-				strChannel = ""
-			end
-	
-			xml:AddLine(strTime .. strChannel, crChannel, self.strFontOption, "Left")
-			if strWhisperName:len() > 0 then
-	
-				local strWhisperNamePrefix = ""
-				if eChannelType == ChatSystemLib.ChatChannel_Whisper or eChannelType == ChatSystemLib.ChatChannel_AccountWhisper then
-					if tMessage.bSelf then
-						strWhisperNamePrefix = Apollo.GetString("ChatLog_To")
-					else
-						strWhisperNamePrefix = Apollo.GetString("ChatLog_From")
-					end
-				end
-	
-				xml:AppendText( strWhisperNamePrefix, crText, self.strFontOption)
-	
-				if tMessage.bGM then
-					xml:AppendImage(kstrGMIcon, 16, 16)
-				end
-	
-				xml:AppendText( strWhisperName, crPlayerName, self.strFontOption, {CharacterName=strWhisperName, nReportId=tMessage.nReportId}, "Source")
-			end
-			xml:AppendText( strPresenceState .. ": ", crChannel, self.strFontOption, "Left")
-		end
-	
-		local xmlBubble = XmlDoc.new() -- This is the speech bubble form
-		xmlBubble:AddLine("", crChannel, self.strFontOption, "Center")
-	
-		local bHasVisibleText = false
-		for idx, tSegment in ipairs( tMessage.arMessageSegments ) do
-			local strText = tSegment.strText
-			--[[
-			Second half of this line commented out to remove cross faction filtering. bs:041214
-			]]--
-			local bAlien = tSegment.bAlien -- or tMessage.bCrossFaction
-			local bShow = false
-	
-			if self.eRoleplayOption == 3 then
-				bShow = not tSegment.bRolePlay
-			elseif self.eRoleplayOption == 2 then
-				-- bs:050214, block below legacy for possible fix later, see method Apollo.ParseInput(strText)
-				--[[
-				-- Force say and emote to IC
-				if eChannelType == ChatSystemLib.ChatChannel_Say or eChannelType == ChatSystemLib.ChatChannel_Emote then
-					tSegment.bRolePlay = true
-				end
-				-- Catch Whispers
-				if eChannelType == ChatSystemLib.ChatChannel_Whisper or eChannelType==ChatSystemLib.ChatChannel_AccountWhisper then
-					bShow = true
-				else
-					bShow = tSegment.bRolePlay
-				end
-				]]--
-				-- bs:050214, Restored original functionality due to the issue with being unable to catch input string presend
-				bShow = tSegment.bRolePlay
-			else
-				bShow = true;
-			end
-	
-			if bShow then
-				local crChatText = crText;
-				local crBubbleText = kstrColorChatRegular
-				local strChatFont = self.strFontOption
-				local strBubbleFont = kstrBubbleFont
-				local tLink = {}
-	
-	
-				if tSegment.uItem ~= nil then -- item link
-					-- replace me with correct colors
-					strText = String_GetWeaselString(Apollo.GetString("CRB_Brackets"), tSegment.uItem:GetName())
-					crChatText = karEvalColors[tSegment.uItem:GetItemQuality()]
-					crBubbleText = ApolloColor.new("white")
-	
-					tLink.strText = strText
-					tLink.uItem = tSegment.uItem
-	
-				elseif tSegment.uQuest ~= nil then -- quest link
-					-- replace me with correct colors
-					strText = String_GetWeaselString(Apollo.GetString("CRB_Brackets"), tSegment.uQuest:GetTitle())
-					crChatText = ApolloColor.new("green")
-					crBubbleText = ApolloColor.new("green")
-	
-					tLink.strText = strText
-					tLink.uQuest = tSegment.uQuest
-	
-				elseif tSegment.uArchiveArticle ~= nil then -- archive article
-					-- replace me with correct colors
-					strText = String_GetWeaselString(Apollo.GetString("CRB_Brackets"), tSegment.uArchiveArticle:GetTitle())
-					crChatText = ApolloColor.new("cyan")
-					crBubbleText = ApolloColor.new("cyan")
-	
-					tLink.strText = strText
-					tLink.uArchiveArticle = tSegment.uArchiveArticle
-	
-				else
-					if tSegment.bRolePlay then
-						crBubbleText = kstrColorChatRoleplay
-						strChatFont = self.strRPFontOption
-						strBubbleFont = kstrDialogFontRP
-					end
-	
-					if bAlien or tSegment.bProfanity then -- Weak filter. Note only profanity is scrambled.
-						strChatFont = self.strAlienFontOption
-						strBubbleFont = self.strAlienFontOption
-					end
-				end
-	
-				if next(tLink) == nil then
-					-- This is to location to substitute in our replacement for what it sends to chat. bs: 042314
-					--xml:AppendText(strText, crChatText, strChatFont) original send to xml line
-					if (eChannelType == ChatSystemLib.ChatChannel_Say) or (eChannelType == ChatSystemLib.ChatChannel_Emote) then
-						parsedText = Killroy:ParseForContext(strText, eChannelType)
-						Killroy:DumpToChat(parsedText, strChatFont, xml)
-					else
-						xml:AppendText(strText, crChatText, strChatFont)
-					end
-				else
-					local strLinkIndex = tostring( self:HelperSaveLink(tLink) )
-					-- append text can only save strings as attributes.
-					xml:AppendText(strText, crChatText, strChatFont, {strIndex=strLinkIndex} , "Link")
-				end
-	
-				if (eChannelType == ChatSystemLib.ChatChannel_Say) or (eChannelType == ChatSystemLib.ChatChannel_Emote) then
-					parsedText = Killroy:ParseForContext(strText, eChannelType)
-					Killroy:DumpToChat(parsedText, strBubbleFont, xmlBubble)
-				else
-					xmlBubble:AppendText(strText, crBubbleText, strBubbleFont) -- Format for bubble; regular
-				end
-				bHasVisibleText = bHasVisibleText or self:HelperCheckForEmptyString(strText)
-			end
-		end
-	
-		if bHasVisibleText then
-			if tMessage.unitSource and tMessage.bShowChatBubble then
-				tMessage.unitSource:AddTextBubble(xmlBubble)
-			end
-	
-			self:QueueAChatLine(xml, eChannelType)
-		end
-	end
-	return true
 end
 
 function Killroy:Change_HelperGenerateChatMessage()
@@ -705,10 +378,9 @@ function Killroy:Change_HelperGenerateChatMessage()
 				end
 
 				if next(tLink) == nil then
-					--xml:AppendText(strText, crChatText, strChatFont) original send to xml line
 					if (eChannelType == ChatSystemLib.ChatChannel_Say) or (eChannelType == ChatSystemLib.ChatChannel_Emote) then
-						parsedText = Killroy:ParseForContext(strText, eChannelType)
-						Killroy:DumpToChat(parsedText, strChatFont, xml)
+						parsedText = Killroy:ParseForContext(strText, strChatFont, eChannelType)
+						xml:AddLine(parsedText)
 					else
 						xml:AppendText(strText, crChatText, strChatFont)
 					end
@@ -736,98 +408,6 @@ function Killroy:Change_HelperGenerateChatMessage()
 	return true
 
 end
-
-
-function Killroy:Change_OnRoleplayBtn()
-    local aAddon = Apollo.GetAddon("ChatLog")
-    if aAddon == nil then
-        return false
-    end
-    function aAddon:OnRoleplayBtn(wndHandler, wndControl)
-		if wndHandler ~= wndControl then
-			return false
-		end
-	
-		local wndParent = wndControl:GetParent()
-		self.eRoleplayOption = wndParent:GetRadioSel("RoleplayViewToggle")
-		for idx, wndChat in pairs(self.tChatWindows) do
-			--[[
-			--disabled auto insertion of RP marker. bs: 041814
-			if self.eRoleplayOption == 2 then
-				wndChat:FindChild("Input"):SetText(Apollo.GetString("ChatLog_RPMarker"))
-			else
-				wndChat:FindChild("Input"):SetText("")
-			end
-			]]--
-			wndChat:FindChild("Input"):SetText("")
-		end
-	end
-	return true
-end
-
-function Killroy:Change_OnChatInputReturn()
-	local aAddon = Apollo.GetAddon('ChatLog')
-	if aAddon == nil then
-		return false
-	end
-	
-	function aAddon:OnChatInputReturn(wndHandler, wndControl, strText)
-
-		if wndControl:GetName() == "Input" then
-			local wndForm = wndControl:GetParent()
-			strText = self:HelperReplaceLinks(strText, wndControl:GetAllLinks())
-
-			local wndInput = wndForm:FindChild("Input")
-
-			wndControl:SetText("")
-			--[[
-			if self.eRoleplayOption == 2 then
-				wndControl:SetText(Apollo.GetString("ChatLog_RPMarker"))
-			end
-			]]--
-
-			local tChatData = wndForm:GetData()
-			local bViewedChannel = true
-			local tInput = ChatSystemLib.SplitInput(strText)
-			if strText ~= "" and strText ~= Apollo.GetString("ChatLog_RPMarker") and strText ~= Apollo.GetString("ChatLog_Marker") then
-
-				local channelCurrent = tInput.channelCommand or tChatData.channelCurrent
-
-				if channelCurrent:GetType() == ChatSystemLib.ChatChannel_Command then
-					if tInput.bValidCommand then -- good command
-						ChatSystemLib.Command( strText )
-					else	-- bad command
-						local strFailString = String_GetWeaselString(Apollo.GetString("ChatLog_UnknownCommand"), Apollo.GetString("CombatFloaterType_Error"), tInput.strCommand)
-						ChatSystemLib.PostOnChannel( ChatSystemLib.ChatChannel_Command, strFailString, "" )
-						wndInput:SetText(String_GetWeaselString(Apollo.GetString("ChatLog_MessageToPlayer"), tInput.strCommand, tInput.strMessage))
-						wndInput:SetFocus()
-						local strSubmitted = wndForm:FindChild("Input"):GetText()
-						wndInput:SetSel(strSubmitted:len(), -1)
-						return
-					end
-				else
-					tChatData.channelCurrent = channelCurrent
-
-					bViewedChannel = self:VerifyChannelVisibility(channelCurrent, tInput, wndForm)
-				end
-			end
-
-			local crText = self.arChatColor[tChatData.channelCurrent:GetType()] or ApolloColor.new("white")
-			local wndInputType = wndForm:FindChild("InputTypeBtn:InputType")
-			wndForm:GetData().crText = crText
-			wndForm:FindChild("InputTypeBtn:InputType"):SetTextColor(crText)
-			wndInput:SetTextColor(crText)
-			wndInputType:SetText(tChatData.channelCurrent:GetCommand())
-
-			if bViewedChannel ~= true then
-				wndInputType:SetText("X " .. tInput.strCommand)
-				wndInputType:SetTextColor(kcrInvalidColor)
-			end
-		end
-	end
-end
-
-
 
 -----------------------------------------------------------------------------------------------
 -- KillroyForm Functions
