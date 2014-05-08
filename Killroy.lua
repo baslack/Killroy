@@ -129,6 +129,8 @@ function Killroy:OnLoad()
 	
 	--bs: 050214, they moved the filtering out of OnChatMessage and into a new method called HelperGenerateChatMessage
 	self:Change_HelperGenerateChatMessage()
+	self:Change_OnChatInputReturn()
+	self:Change_OnRoleplayBtn()
 end
 
 -----------------------------------------------------------------------------------------------
@@ -481,6 +483,93 @@ function Killroy:Change_HelperGenerateChatMessage()
 
 end
 
+function Killroy:Change_OnChatInputReturn()
+	local aAddon = Apollo.GetAddon("ChatLog")
+	if aAddon == nil then
+		return false
+	end
+	function aAddon:OnChatInputReturn(wndHandler, wndControl, strText)
+
+		if wndControl:GetName() == "Input" then
+			local wndForm = wndControl:GetParent()
+			strText = self:HelperReplaceLinks(strText, wndControl:GetAllLinks())
+
+			local wndInput = wndForm:FindChild("Input")
+
+			wndControl:SetText("")
+			--[[
+			if self.eRoleplayOption == 2 then
+				wndControl:SetText(Apollo.GetString("ChatLog_RPMarker"))
+			end
+			]]--
+
+			local tChatData = wndForm:GetData()
+			local bViewedChannel = true
+			local tInput = ChatSystemLib.SplitInput(strText)
+			if strText ~= "" and strText ~= Apollo.GetString("ChatLog_RPMarker") and strText ~= Apollo.GetString("ChatLog_Marker") then
+
+				local channelCurrent = tInput.channelCommand or tChatData.channelCurrent
+
+				if channelCurrent:GetType() == ChatSystemLib.ChatChannel_Command then
+					if tInput.bValidCommand then -- good command
+						ChatSystemLib.Command( strText )
+					else	-- bad command
+						local strFailString = String_GetWeaselString(Apollo.GetString("ChatLog_UnknownCommand"), Apollo.GetString("CombatFloaterType_Error"), tInput.strCommand)
+						ChatSystemLib.PostOnChannel( ChatSystemLib.ChatChannel_Command, strFailString, "" )
+						wndInput:SetText(String_GetWeaselString(Apollo.GetString("ChatLog_MessageToPlayer"), tInput.strCommand, tInput.strMessage))
+						wndInput:SetFocus()
+						local strSubmitted = wndForm:FindChild("Input"):GetText()
+						wndInput:SetSel(strSubmitted:len(), -1)
+						return
+					end
+				else
+					tChatData.channelCurrent = channelCurrent
+					if self.eRoleplayOption == 2 then
+						tInput.strMessage = Apollo.GetString("ChatLog_RPMarker") .. tInput.strMessage
+					end
+					bViewedChannel = self:VerifyChannelVisibility(channelCurrent, tInput, wndForm)
+				end
+			end
+
+			local crText = self.arChatColor[tChatData.channelCurrent:GetType()] or ApolloColor.new("white")
+			local wndInputType = wndForm:FindChild("InputTypeBtn:InputType")
+			wndForm:GetData().crText = crText
+			wndForm:FindChild("InputTypeBtn:InputType"):SetTextColor(crText)
+			wndInput:SetTextColor(crText)
+			wndInputType:SetText(tChatData.channelCurrent:GetCommand())
+
+			if bViewedChannel ~= true then
+				wndInputType:SetText("X " .. tInput.strCommand)
+				wndInputType:SetTextColor(kcrInvalidColor)
+			end
+		end
+	end
+end
+
+function Killroy:Change_OnRoleplayBtn()
+	local aAddon = Apollo.GetAddon("ChatLog")
+	if aAddon == nil then
+		return false
+	end
+	function aAddon:OnRoleplayBtn(wndHandler, wndControl)
+		if wndHandler ~= wndControl then
+			return false
+		end
+
+		local wndParent = wndControl:GetParent()
+		self.eRoleplayOption = wndParent:GetRadioSel("RoleplayViewToggle")
+		for idx, wndChat in pairs(self.tChatWindows) do
+			--[[
+			if self.eRoleplayOption == 2 then
+				wndChat:FindChild("Input"):SetText(Apollo.GetString("ChatLog_RPMarker"))
+			else
+				wndChat:FindChild("Input"):SetText("")
+			end
+			]]--
+			wndChat:FindChild("Input"):SetText("")
+		end
+	end
+end
 -----------------------------------------------------------------------------------------------
 -- KillroyForm Functions
 -----------------------------------------------------------------------------------------------
