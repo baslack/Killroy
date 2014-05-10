@@ -92,8 +92,10 @@ local kcrSayEmoteChar = '*'
 local kcrEmoteQuoteChar  = '"'
 local kstrEmote = 'emote'
 local kstrSay = 'say'
+local kstrOOC = 'ooc'
 local kstrEmoteColor = 'ffff9900'
 local kstrSayColor = 'ffffffff'
+local kstrOOCColor 	= 'ff7fffb9'
 
 -----------------------------------------------------------------------------------------------
 -- Initialization
@@ -138,6 +140,89 @@ end
 -----------------------------------------------------------------------------------------------
 -- Define general functions here
 
+function Killroy:AltParseForContext(strText, eChannelType)
+	-- search for asterik emotes
+	-- search for quotes
+	-- search for OOC '((<verbage>))'
+	-- color remainder with channel color
+	
+	function tagByChan()
+		if eChannelType == ChatSystemLib.ChatChannel_Say then
+			return 'say'
+		elseif eChannelType == ChatSystemLib.ChatChannel_Emote then
+			return 'emote'
+		else
+			return nil
+		end
+	end
+	
+	function ternary(truth, a, b)
+		if truth then
+			return a
+		else 
+			return b
+		end
+	end
+	
+	local parsedText = {}
+	local pT_index = 1
+	
+	local toggle_ooc = false
+	local toggle_emote = false
+	local toggle_quote = false
+	local first = true
+	
+	parsedText['runtest'] = true
+	
+	for word in strText:gmatch('[^%s]+') do
+		parsedText['word'] = true
+
+		word_done = false
+		
+		for tag in word:gmatch('%p+') do
+			parsedText['tag'] = true
+			if tag == '((' then
+				toggle_ooc = true
+			end
+			if tag == '*' then
+				toggle_emote = not(toggle_emote)
+			end
+			if tagg == '"' then
+				toggle_quote = not(toggle_quote)
+			end
+			
+			if toggle_ooc and not(word_done) then
+				parsedText[pT_index] = {ternary(first,'',' ')..word, 'ooc'}
+				pT_index = pT_index + 1
+				word_done = true
+			elseif toggle_emote and not(word_done) then
+				parsedText[pT_index] = {ternary(first,'',' ')..word, 'emote'}
+				pT_index = pT_index + 1
+				word_done = true
+			elseif toggle_quote and not(word_done) then
+				parsedText[pT_index] = {ternary(first,'',' ')..word, 'emote'}
+				pT_index = pT_index + 1
+				word_done = true
+			end
+			
+			if tag == '))' then
+				toggle_ooc = false
+			end
+		end
+		
+		if not(word_done) then
+			parsedText[pT_index] = {ternary(first,'',' ')..word, tagByChan()}
+			pT_index = pT_index + 1
+			word_done = true
+		end
+		
+		first = false
+	end
+	
+	return parsedText
+	
+end
+
 function Killroy:ParseForContext(strText, eChannelType)
 	--[[
 	This function will take incoming text and do the following:
@@ -157,7 +242,6 @@ function Killroy:ParseForContext(strText, eChannelType)
 	local parsedText = {}
 	local pT_idx = 1
 	
-		
 	if eChannelType == ChatSystemLib.ChatChannel_Say then
 		-- match for emotes
 		pattern = '[' .. kcrSayEmoteChar .. '][^' .. kcrSayEmoteChar .. ']*[' .. kcrSayEmoteChar ..']*'
@@ -231,8 +315,10 @@ function Killroy:DumpToChat(parsedText, strChatFont, xml)
 	for i,t in ipairs(parsedText) do
 		if t[2] == kstrEmote then
 			xml:AppendText(t[1], kstrEmoteColor, strChatFont)
-		else
+		elseif t[2] == kstrSay then
 			xml:AppendText(t[1], kstrSayColor, strChatFont)
+		else
+			xml:AppendText(t[1], kstrOOCColor, strChatFont)
 		end
 	end
 	return true
