@@ -156,69 +156,68 @@ function Killroy:AltParseForContext(strText, eChannelType)
 		end
 	end
 	
-	function ternary(truth, a, b)
-		if truth then
-			return a
-		else 
-			return b
-		end
-	end
-	
 	local parsedText = {}
-	local pT_index = 1
-	
-	local toggle_ooc = false
-	local toggle_emote = false
-	local toggle_quote = false
-	local first = true
-	
-	parsedText['runtest'] = true
-	
-	for word in strText:gmatch('[^%s]+') do
-		parsedText['word'] = true
-
-		word_done = false
 		
-		for tag in word:gmatch('%p+') do
-			parsedText['tag'] = true
-			if tag == '((' then
-				toggle_ooc = true
-			end
-			if tag == '*' then
-				toggle_emote = not(toggle_emote)
-			end
-			if tagg == '"' then
-				toggle_quote = not(toggle_quote)
-			end
-			
-			if toggle_ooc and not(word_done) then
-				parsedText[pT_index] = {ternary(first,'',' ')..word, 'ooc'}
-				pT_index = pT_index + 1
-				word_done = true
-			elseif toggle_emote and not(word_done) then
-				parsedText[pT_index] = {ternary(first,'',' ')..word, 'emote'}
-				pT_index = pT_index + 1
-				word_done = true
-			elseif toggle_quote and not(word_done) then
-				parsedText[pT_index] = {ternary(first,'',' ')..word, 'emote'}
-				pT_index = pT_index + 1
-				word_done = true
-			end
-			
-			if tag == '))' then
-				toggle_ooc = false
-			end
-		end
-		
-		if not(word_done) then
-			parsedText[pT_index] = {ternary(first,'',' ')..word, tagByChan()}
-			pT_index = pT_index + 1
-			word_done = true
-		end
-		
-		first = false
+	emotes = {}
+	quotes = {}
+	oocs = {}
+	
+	index = 1
+	for emote in strText:gmatch('%b**') do
+		first, last = strText:find(emote, index, true)
+		emotes[first] = last
+		index = last + 1
 	end
 	
+	index = 1
+	for quote in strText:gmatch('%b""') do
+		first, last = strText:find(quote, index, true)
+		quotes[first] = last
+		index = last + 1
+	end
+	
+	index = 1
+	for ooc in strText:gmatch('%(%(.*%)%)') do
+		first, last = strText:find(ooc, index, true)
+		oocs[first] = last
+		index = last + 1
+	end
+	
+	buffer = ''
+	index = 1
+	
+	while index <= strText:len() do
+		if oocs[index] then
+			if buffer then
+				table.insert(parsedText, {buffer, tagByChan()})
+				buffer = ''
+			end
+			table.insert(parsedText, {strText:sub(index, oocs[index]), 'ooc'})
+			index = oocs[index] + 1
+		elseif emotes[index] then
+			if buffer then
+				table.insert(parsedText, {buffer, tagByChan()})
+				buffer = ''
+			end
+			table.insert(parsedText, {strText:sub(index, emotes[index]), 'emote'})
+			index = emotes[index] + 1
+		elseif quotes[index] then
+			if buffer then
+				table.insert(parsedText, {buffer, tagByChan()})
+				buffer = ''
+			end
+			table.insert(parsedText, {strText:sub(index, quotes[index]), 'quote'})
+			index = quotes[index] + 1
+		else
+			buffer = buffer .. strText:sub(index, index)
+			index = index + 1
+		end
+	end
+	
+	if buffer ~= '' then
+		table.insert(parsedText, {buffer, tagByChan()})
+	end
+
 	return parsedText
 	
 end
@@ -315,9 +314,9 @@ function Killroy:DumpToChat(parsedText, strChatFont, xml)
 	for i,t in ipairs(parsedText) do
 		if t[2] == kstrEmote then
 			xml:AppendText(t[1], kstrEmoteColor, strChatFont)
-		elseif t[2] == kstrSay then
+		elseif t[2] == kstrSay or t[2] == 'quote' then
 			xml:AppendText(t[1], kstrSayColor, strChatFont)
-		else
+		elseif t[2] == 'ooc' then
 			xml:AppendText(t[1], kstrOOCColor, strChatFont)
 		end
 	end
@@ -537,7 +536,7 @@ function Killroy:Change_HelperGenerateChatMessage()
 				if next(tLink) == nil then
 					--xml:AppendText(strText, crChatText, strChatFont) original send to xml line
 					if (eChannelType == ChatSystemLib.ChatChannel_Say) or (eChannelType == ChatSystemLib.ChatChannel_Emote) then
-						parsedText = Killroy:ParseForContext(strText, eChannelType)
+						parsedText = Killroy:AltParseForContext(strText, eChannelType)
 						Killroy:DumpToChat(parsedText, strChatFont, xml)
 					elseif (eChannelType == ChatSystemLib.ChatChannel_AnimatedEmote) then
 						xml:AppendText(strText, kstrEmoteColor, strChatFont)
