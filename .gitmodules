@@ -1,0 +1,3 @@
+[submodule "lib/GeminiColor"]
+	path = lib/GeminiColor
+	url = https://github.com/wildstarnasa/GeminiColor.git
