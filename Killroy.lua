@@ -673,6 +673,23 @@ function Killroy:OnCancel()
 	self.wndMain:Close() -- hide the window
 end
 
+function Killroy:OnSetOOCColor( wndHandler, wndControl, eMouseButton )
+end
+
+function Killroy:OnSetEmoteColor( wndHandler, wndControl, eMouseButton )
+end
+
+function Killroy:OnSetSayColor( wndHandler, wndControl, eMouseButton )
+end
+
+function Killroy:ToggleICChat( wndHandler, wndControl, eMouseButton )
+end
+
+function Killroy:ToggleRPOnly( wndHandler, wndControl, eMouseButton )
+end
+
+function Killroy:ToggleCrossFaction( wndHandler, wndControl, eMouseButton )
+end
 
 -----------------------------------------------------------------------------------------------
 -- Killroy Instance
