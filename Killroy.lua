@@ -124,6 +124,8 @@ end
 -- Killroy OnLoad
 -----------------------------------------------------------------------------------------------
 function Killroy:OnLoad()
+	Apollo.RegisterSlashCommand("killroy", "OnKillroyOn", self)
+
     -- load our form file
 	self.xmlDoc = XmlDoc.CreateFromFile("Killroy.xml")
 	self.wndMain = Apollo.LoadForm(self.xmlDoc, "KillroyForm", nil, self)
@@ -139,6 +141,10 @@ end
 -- Killroy Functions
 -----------------------------------------------------------------------------------------------
 -- Define general functions here
+
+function Killroy:OnKillroyOn()
+	self.wndMain:Show(true)
+end
 
 function Killroy:DebugTest()
 	Print("Printing to debug.")
