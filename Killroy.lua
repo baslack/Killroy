@@ -140,6 +140,11 @@ end
 -----------------------------------------------------------------------------------------------
 -- Define general functions here
 
+function Killroy:DebugTest()
+	Print("Printing to debug.")
+	return true
+end
+
 function Killroy:AltParseForContext(strText, eChannelType)
 	-- search for asterik emotes
 	-- search for quotes
