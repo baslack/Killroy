@@ -128,6 +128,7 @@ function Killroy:OnLoad()
 
     -- load our form file
 	self.xmlDoc = XmlDoc.CreateFromFile("Killroy.xml")
+	Apollo.LoadSprites("KIL.xml")
 	self.wndMain = Apollo.LoadForm(self.xmlDoc, "KillroyForm", nil, self)
 	self.wndMain:Show(false, true)
 	
