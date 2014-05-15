@@ -25,7 +25,6 @@ local Killroy = {}
 -----------------------------------------------------------------------------------------------
 -- e.g. local kiExampleVariableMax = 999
 
--- local Killroy = {}
 local kcrInvalidColor = ApolloColor.new("InvalidChat")
 local kcrValidColor = ApolloColor.new("white")
 
@@ -88,14 +87,15 @@ local karChannelTypeToColor = -- TODO Merge into one table like this
 local ktDefaultHolds = {}
 ktDefaultHolds[ChatSystemLib.ChatChannel_Whisper] = true
 
-local kcrSayEmoteChar = '*'
-local kcrEmoteQuoteChar  = '"'
-local kstrEmote = 'emote'
-local kstrSay = 'say'
-local kstrOOC = 'ooc'
+local tagEmo = 1
+local tagSay = 2
+local tagOOC = 3
 local kstrEmoteColor = 'ffff9900'
 local kstrSayColor = 'ffffffff'
 local kstrOOCColor 	= 'ff7fffb9'
+local bCrossFactionEnabled = true
+local bFormatChatEnabled = true
+local bRPModeOnlyEnabled = true
 
 -----------------------------------------------------------------------------------------------
 -- Initialization
@@ -128,7 +128,7 @@ function Killroy:OnLoad()
 
     -- load our form file
 	self.xmlDoc = XmlDoc.CreateFromFile("Killroy.xml")
-	Apollo.LoadSprites("KIL.xml")
+	Apollo.LoadSprites("KIL.xml", "KIL")
 	self.wndMain = Apollo.LoadForm(self.xmlDoc, "KillroyForm", nil, self)
 	self.wndMain:Show(false, true)
 	
@@ -152,7 +152,24 @@ function Killroy:DebugTest()
 	return true
 end
 
-function Killroy:AltParseForContext(strText, eChannelType)
+function Killroy:GetPreferences()
+	prefs = {}
+	prefs['bCrossFactionEnabled'] = bCrossFactionEnabled
+	prefs['bRPModeOnlyEnabled'] = bRPModeOnlyEnabled
+	prefs['bFormatChatEnabled'] = bFormatChatEnabled
+	prefs['kstrEmoteColor'] = kstrEmoteColor
+	prefs['kstrSayColor'] = kstrSayColor
+	prefs['kstrOOCColor'] 	= kstrOOCColor
+	return prefs
+end
+
+function Killroy:LoadPreference()
+end
+
+function Killroy:SavePreferences()
+end
+	
+function Killroy:ParseForContext(strText, eChannelType)
 	-- search for asterik emotes
 	-- search for quotes
 	-- search for OOC '((<verbage>))'
@@ -160,9 +177,9 @@ function Killroy:AltParseForContext(strText, eChannelType)
 	
 	function tagByChan()
 		if eChannelType == ChatSystemLib.ChatChannel_Say then
-			return 'say'
+			return tagSay
 		elseif eChannelType == ChatSystemLib.ChatChannel_Emote then
-			return 'emote'
+			return tagEmo
 		else
 			return nil
 		end
@@ -204,21 +221,21 @@ function Killroy:AltParseForContext(strText, eChannelType)
 				table.insert(parsedText, {buffer, tagByChan()})
 				buffer = ''
 			end
-			table.insert(parsedText, {strText:sub(index, oocs[index]), 'ooc'})
+			table.insert(parsedText, {strText:sub(index, oocs[index]), tagOOC})
 			index = oocs[index] + 1
 		elseif emotes[index] then
 			if buffer then
 				table.insert(parsedText, {buffer, tagByChan()})
 				buffer = ''
 			end
-			table.insert(parsedText, {strText:sub(index, emotes[index]), 'emote'})
+			table.insert(parsedText, {strText:sub(index, emotes[index]), tagEmo})
 			index = emotes[index] + 1
 		elseif quotes[index] then
 			if buffer then
 				table.insert(parsedText, {buffer, tagByChan()})
 				buffer = ''
 			end
-			table.insert(parsedText, {strText:sub(index, quotes[index]), 'quote'})
+			table.insert(parsedText, {strText:sub(index, quotes[index]), tagSay})
 			index = quotes[index] + 1
 		else
 			buffer = buffer .. strText:sub(index, index)
@@ -234,101 +251,13 @@ function Killroy:AltParseForContext(strText, eChannelType)
 	
 end
 
-function Killroy:ParseForContext(strText, eChannelType)
-	--[[
-	This function will take incoming text and do the following:
-	if SAY chat it will look for '*' and segment the string into sub-strings
-	if EMOTE chat it will look for '"' and segment the string into substrings
-	create an indexed table that will contain a sub-table formated thus:
-	{{{string},{format}}...}
-	]]--
-	
-	--[[
-		tMessage = {
-			{1, "string"}, -- 1 = say type
-			{2, "string"}, -- 2 = emote (Keep the information small and easy to process. use the same colors for say and emote in each other)
-		}
-	]]
-	
-	local parsedText = {}
-	local pT_idx = 1
-	
-	if eChannelType == ChatSystemLib.ChatChannel_Say then
-		-- match for emotes
-		pattern = '[' .. kcrSayEmoteChar .. '][^' .. kcrSayEmoteChar .. ']*[' .. kcrSayEmoteChar ..']*'
-		
-		index = 1 --start of string
-		length = strText:len()
-		
-		-- if the string has emotes, parse them
-		while strText:find(pattern, index) ~= nil do
-			first, last = strText:find(pattern, index)
-			-- from index, line starts with an emote
-			if first == index then
-				parsedText[pT_idx] = {strText:sub(first, last), kstrEmote}
-				pT_idx = pT_idx + 1
-				index = last + 1
-			-- from index, line starts with copy
-			else
-				parsedText[pT_idx] = {strText:sub(index, (first-1)), kstrSay}
-				pT_idx = pT_idx + 1
-				parsedText[pT_idx] = {strText:sub(first, last), kstrEmote}
-				index = last + 1
-				pT_idx = pT_idx + 1
-			end			
-		end
-		
-		-- no emotes in string
-		if strText:find(pattern, index) == nil then
-			parsedText[pT_idx] = {strText:sub(index, length), kstrSay}
-		end
-		
-		--[[
-			string.gsub(strText,"%b\"\"", function(strSubString) return "</T>"..kstrSayFormat..strSubString.."</T>"..kstrEmote end)
-			
-			-- this should replace the quoted substring with the quoted substring surrounded by the correct XML markup. You don't have to use XmlDoc:AppendText, you can take the formatted text and simply use XmlDoc:AddLine() We just ahve to add the openign and closing tags to strText before setting it.
-		]]
-		
-	elseif eChannelType == ChatSystemLib.ChatChannel_Emote then
-		-- match for quotes
-		pattern = '[' .. kcrEmoteQuoteChar .. '][^' .. kcrEmoteQuoteChar .. ']*[' .. kcrEmoteQuoteChar ..']*'
-		
-		index = 1 --start of string
-		length = strText:len()
-		
-		-- if the string has quotes, parse them
-		while strText:find(pattern, index) ~= nil do
-			first, last = strText:find(pattern, index)
-			-- from index, line starts with an quote
-			if first == index then
-				parsedText[pT_idx] = {strText:sub(first, last), kstrSay}
-				pT_idx = pT_idx + 1
-				index = last + 1
-			-- from index, line starts with emote
-			else
-				parsedText[pT_idx] = {strText:sub(index, (first-1)), kstrEmote}
-				pT_idx = pT_idx + 1
-				parsedText[pT_idx] = {strText:sub(first, last), kstrSay}
-				index = last + 1
-				pT_idx = pT_idx + 1
-			end			
-		end
-		
-		-- no quotes in string
-		if strText:find(pattern, index) == nil then
-			parsedText[pT_idx] = {strText:sub(index, length), kstrEmote}
-		end
-	end
-	return parsedText
-end
-
 function Killroy:DumpToChat(parsedText, strChatFont, xml)
 	for i,t in ipairs(parsedText) do
-		if t[2] == kstrEmote then
+		if t[2] == tagEmo then
 			xml:AppendText(t[1], kstrEmoteColor, strChatFont)
-		elseif t[2] == kstrSay or t[2] == 'quote' then
+		elseif t[2] == tagSay then
 			xml:AppendText(t[1], kstrSayColor, strChatFont)
-		elseif t[2] == 'ooc' then
+		elseif t[2] == tagOOC then
 			xml:AppendText(t[1], kstrOOCColor, strChatFont)
 		end
 	end
@@ -342,6 +271,7 @@ function Killroy:Change_HelperGenerateChatMessage()
 	end
 	
 	function aAddon:HelperGenerateChatMessage(tQueuedMessage)
+		local prefs = Killroy:GetPreferences()
 		if tQueuedMessage.xml then
 			return
 		end
@@ -426,15 +356,20 @@ function Killroy:Change_HelperGenerateChatMessage()
 
 		-- We build strings backwards, right to left
 		if eChannelType == ChatSystemLib.ChatChannel_AnimatedEmote then -- emote animated channel gets special formatting
-			
-			xml:AddLine(strTime, kstrEmoteColor, self.strFontOption, "Left")
-			--bs: 050314, changing animated emotes to match the emote color
-			--xml:AddLine(strTime, crChannel, self.strFontOption, "Left")
+			-- bs:051414, incorporating preferences variables
+			if prefs['bFormatChatEnabled'] then
+				xml:AddLine(strTime, kstrEmoteColor, self.strFontOption, "Left")
+			else
+				xml:AddLine(strTime, crChannel, self.strFontOption, "Left")
+			end
 
 		elseif eChannelType == ChatSystemLib.ChatChannel_Emote then -- emote channel gets special formatting
-			xml:AddLine(strTime, kstrEmoteColor, self.strFontOption, "Left")
-			--bs:050314, making emotes match what Killroy states they should be
-			--xml:AddLine(strTime, crChannel, self.strFontOption, "Left")
+			-- bs: 051414, incorporating preferences variables
+			if prefs['bFormatChatEnabled'] then
+				xml:AddLine(strTime, kstrEmoteColor, self.strFontOption, "Left")
+			else
+				xml:AddLine(strTime, crChannel, self.strFontOption, "Left")
+			end
 			if strWhisperName:len() > 0 then
 				if tMessage.bGM then
 					xml:AppendImage(kstrGMIcon, 16, 16)
@@ -486,7 +421,8 @@ function Killroy:Change_HelperGenerateChatMessage()
 		local bHasVisibleText = false
 		for idx, tSegment in ipairs( tMessage.arMessageSegments ) do
 			local strText = tSegment.strText
-			local bAlien = tSegment.bAlien --or tMessage.bCrossFaction, bs:050214 Disabling Cross faction filter
+			-- bs:051414, incorporating preferences variables
+			local bAlien = tSegment.bAlien or (tMessage.bCrossFaction and not(prefs['bCrossFactionEnabled']))
 			local bShow = false
 
 			if self.eRoleplayOption == 3 then
@@ -546,17 +482,16 @@ function Killroy:Change_HelperGenerateChatMessage()
 				end
 
 				if next(tLink) == nil then
-					--xml:AppendText(strText, crChatText, strChatFont) original send to xml line
-					if (eChannelType == ChatSystemLib.ChatChannel_Say) or (eChannelType == ChatSystemLib.ChatChannel_Emote) then
-						parsedText = Killroy:AltParseForContext(strText, eChannelType)
+					-- bs:051414, incorportating preferences
+					if prefs['bFormatChatEnabled'] and ((eChannelType == ChatSystemLib.ChatChannel_Say) or (eChannelType == ChatSystemLib.ChatChannel_Emote)) then
+						parsedText = Killroy:ParseForContext(strText, eChannelType)
 						Killroy:DumpToChat(parsedText, strChatFont, xml)
-					elseif (eChannelType == ChatSystemLib.ChatChannel_AnimatedEmote) then
+					elseif prefs['bFormatChatEnabled'] and (eChannelType == ChatSystemLib.ChatChannel_AnimatedEmote) then
 						xml:AppendText(strText, kstrEmoteColor, strChatFont)
 					else
 						xml:AppendText(strText, crChatText, strChatFont)
 					end
-					--bs:050214, 
-					--xml:AppendText(strText, crChatText, strChatFont)
+
 				else
 					local strLinkIndex = tostring( self:HelperSaveLink(tLink) )
 					-- append text can only save strings as attributes.
@@ -586,7 +521,7 @@ function Killroy:Change_OnChatInputReturn()
 		return false
 	end
 	function aAddon:OnChatInputReturn(wndHandler, wndControl, strText)
-
+		local prefs = Killroy:GetPreferences()
 		if wndControl:GetName() == "Input" then
 			local wndForm = wndControl:GetParent()
 			strText = self:HelperReplaceLinks(strText, wndControl:GetAllLinks())
@@ -594,11 +529,13 @@ function Killroy:Change_OnChatInputReturn()
 			local wndInput = wndForm:FindChild("Input")
 
 			wndControl:SetText("")
-			--[[
-			if self.eRoleplayOption == 2 then
-				wndControl:SetText(Apollo.GetString("ChatLog_RPMarker"))
+			-- bs:051414, incorporating preferences
+			if not(prefs['bRPModeOnlyEnabled']) then
+				if self.eRoleplayOption == 2 then
+					wndControl:SetText(Apollo.GetString("ChatLog_RPMarker"))
+				end
 			end
-			]]--
+
 
 			local tChatData = wndForm:GetData()
 			local bViewedChannel = true
@@ -621,7 +558,7 @@ function Killroy:Change_OnChatInputReturn()
 					end
 				else
 					tChatData.channelCurrent = channelCurrent
-					if self.eRoleplayOption == 2 then
+					if self.eRoleplayOption == 2 and prefs['bRPModeOnlyEnabled'] then
 						tInput.strMessage = Apollo.GetString("ChatLog_RPMarker") .. tInput.strMessage
 					end
 					bViewedChannel = self:VerifyChannelVisibility(channelCurrent, tInput, wndForm)
@@ -649,6 +586,7 @@ function Killroy:Change_OnRoleplayBtn()
 		return false
 	end
 	function aAddon:OnRoleplayBtn(wndHandler, wndControl)
+		local prefs = Killroy:GetPreferences()
 		if wndHandler ~= wndControl then
 			return false
 		end
@@ -656,13 +594,13 @@ function Killroy:Change_OnRoleplayBtn()
 		local wndParent = wndControl:GetParent()
 		self.eRoleplayOption = wndParent:GetRadioSel("RoleplayViewToggle")
 		for idx, wndChat in pairs(self.tChatWindows) do
-			--[[
-			if self.eRoleplayOption == 2 then
-				wndChat:FindChild("Input"):SetText(Apollo.GetString("ChatLog_RPMarker"))
-			else
-				wndChat:FindChild("Input"):SetText("")
+			if not(prefs['bRPModeOnlyEnabled']) then
+				if self.eRoleplayOption == 2 then
+					wndChat:FindChild("Input"):SetText(Apollo.GetString("ChatLog_RPMarker"))
+				else
+					wndChat:FindChild("Input"):SetText("")
+				end
 			end
-			]]--
 			wndChat:FindChild("Input"):SetText("")
 		end
 	end
