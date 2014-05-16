@@ -90,6 +90,7 @@ ktDefaultHolds[ChatSystemLib.ChatChannel_Whisper] = true
 local tagEmo = 1
 local tagSay = 2
 local tagOOC = 3
+
 local kstrEmoteColor = 'ffff9900'
 local kstrSayColor = 'ffffffff'
 local kstrOOCColor 	= 'ff7fffb9'
@@ -106,13 +107,36 @@ function Killroy:new(o)
     self.__index = self 
 
     -- initialize variables here
-
+	if not(self.tPrefs) then
+		self.tPrefs = 
+		{
+			bCrossFaction = true,
+			bRPOnly = true,
+			bFormatChat = true,
+			kstrEmoteColor = 'ffff9900',
+			kstrSayColor = 'ffffffff',
+			kstrOOCColor 	= 'ff7fffb9',
+		}
+		self.tColorBuffer = 
+		{
+			kstrEmoteColor = 'ffff9900',
+			kstrSayColor = 'ffffffff',
+			kstrOOCColor 	= 'ff7fffb9',
+		}
+	else
+		self.tColorBuffer = 
+		{
+			kstrEmoteColor = self.tPrefs['kstrEmoteColor'],
+			kstrSayColor = self.tPrefs['kstrSayColor'],
+			kstrOOCColor 	= self.tPrefs['kstrOOCColor'],
+		}
+	end
     return o
 end
 
 function Killroy:Init()
-	local bHasConfigureFunction = false
-	local strConfigureButtonText = ""
+	local bHasConfigureFunction = true
+	local strConfigureButtonText = "Killroy"
 	local tDependencies = {
 	"ChatLog"
 	}
@@ -131,8 +155,6 @@ function Killroy:OnLoad()
 	Apollo.LoadSprites("KIL.xml", "KIL")
 	self.wndMain = Apollo.LoadForm(self.xmlDoc, "KillroyForm", nil, self)
 	self.wndMain:Show(false, true)
-	
-	--bs: 050214, they moved the filtering out of OnChatMessage and into a new method called HelperGenerateChatMessage
 	self:Change_HelperGenerateChatMessage()
 	self:Change_OnChatInputReturn()
 	self:Change_OnRoleplayBtn()
@@ -143,30 +165,43 @@ end
 -----------------------------------------------------------------------------------------------
 -- Define general functions here
 
+function Killroy:OnConfigure()
+	self.wndMain:FindChild('bCrossFaction'):SetCheck(not(self.tPrefs['bCrossFaction']))
+	self.wndMain:FindChild('bRPOnly'):SetCheck(not(self.tPrefs['bRPOnly']))
+	self.wndMain:FindChild('bFormatChat'):SetCheck(not(self.tPrefs['bFormatChat']))
+	self.wndMain:Show(true)
+end
+
 function Killroy:OnKillroyOn()
+	self.wndMain:FindChild('bCrossFaction'):SetCheck(not(self.tPrefs['bCrossFaction']))
+	self.wndMain:FindChild('bRPOnly'):SetCheck(not(self.tPrefs['bRPOnly']))
+	self.wndMain:FindChild('bFormatChat'):SetCheck(not(self.tPrefs['bFormatChat']))
 	self.wndMain:Show(true)
 end
 
 function Killroy:DebugTest()
 	Print("Printing to debug.")
+	Print("bCrossFaction " .. tostring(self.wndMain:FindChild("bCrossFaction"):IsChecked()))
+	Print("bRPOnly " .. tostring(self.wndMain:FindChild("bRPOnly"):IsChecked()))
+	Print("bFormatChat " .. tostring(self.wndMain:FindChild("bFormatChat"):IsChecked()))
 	return true
 end
 
 function Killroy:GetPreferences()
-	prefs = {}
-	prefs['bCrossFactionEnabled'] = bCrossFactionEnabled
-	prefs['bRPModeOnlyEnabled'] = bRPModeOnlyEnabled
-	prefs['bFormatChatEnabled'] = bFormatChatEnabled
-	prefs['kstrEmoteColor'] = kstrEmoteColor
-	prefs['kstrSayColor'] = kstrSayColor
-	prefs['kstrOOCColor'] 	= kstrOOCColor
-	return prefs
+	return tPrefs
 end
 
-function Killroy:LoadPreference()
+function Killroy:OnSave(eLevel)
+	if (eLevel ~= GameLib.CodeEnumAddonSaveLevel.Account) then return nil end
+	return {tPrefs = self.tPrefs,}
 end
 
-function Killroy:SavePreferences()
+function Killroy:OnRestore(eLevel, tData)
+	if (tData.tPrefs ~= nil) then
+		for i,v in pairs(tData.tPrefs) do
+			self.tPrefs[i] = v
+		end
+	end
 end
 	
 function Killroy:ParseForContext(strText, eChannelType)
@@ -271,7 +306,6 @@ function Killroy:Change_HelperGenerateChatMessage()
 	end
 	
 	function aAddon:HelperGenerateChatMessage(tQueuedMessage)
-		local prefs = Killroy:GetPreferences()
 		if tQueuedMessage.xml then
 			return
 		end
@@ -357,7 +391,7 @@ function Killroy:Change_HelperGenerateChatMessage()
 		-- We build strings backwards, right to left
 		if eChannelType == ChatSystemLib.ChatChannel_AnimatedEmote then -- emote animated channel gets special formatting
 			-- bs:051414, incorporating preferences variables
-			if prefs['bFormatChatEnabled'] then
+			if Killroy.tPrefs['bFormatChat'] then
 				xml:AddLine(strTime, kstrEmoteColor, self.strFontOption, "Left")
 			else
 				xml:AddLine(strTime, crChannel, self.strFontOption, "Left")
@@ -365,7 +399,7 @@ function Killroy:Change_HelperGenerateChatMessage()
 
 		elseif eChannelType == ChatSystemLib.ChatChannel_Emote then -- emote channel gets special formatting
 			-- bs: 051414, incorporating preferences variables
-			if prefs['bFormatChatEnabled'] then
+			if Killroy.tPrefs['bFormatChat'] then
 				xml:AddLine(strTime, kstrEmoteColor, self.strFontOption, "Left")
 			else
 				xml:AddLine(strTime, crChannel, self.strFontOption, "Left")
@@ -422,7 +456,7 @@ function Killroy:Change_HelperGenerateChatMessage()
 		for idx, tSegment in ipairs( tMessage.arMessageSegments ) do
 			local strText = tSegment.strText
 			-- bs:051414, incorporating preferences variables
-			local bAlien = tSegment.bAlien or (tMessage.bCrossFaction and not(prefs['bCrossFactionEnabled']))
+			local bAlien = tSegment.bAlien or (tMessage.bCrossFaction and not(Killroy.tPrefs['bCrossFaction']))
 			local bShow = false
 
 			if self.eRoleplayOption == 3 then
@@ -483,10 +517,10 @@ function Killroy:Change_HelperGenerateChatMessage()
 
 				if next(tLink) == nil then
 					-- bs:051414, incorportating preferences
-					if prefs['bFormatChatEnabled'] and ((eChannelType == ChatSystemLib.ChatChannel_Say) or (eChannelType == ChatSystemLib.ChatChannel_Emote)) then
+					if Killroy.tPrefs['bFormatChat'] and ((eChannelType == ChatSystemLib.ChatChannel_Say) or (eChannelType == ChatSystemLib.ChatChannel_Emote)) then
 						parsedText = Killroy:ParseForContext(strText, eChannelType)
 						Killroy:DumpToChat(parsedText, strChatFont, xml)
-					elseif prefs['bFormatChatEnabled'] and (eChannelType == ChatSystemLib.ChatChannel_AnimatedEmote) then
+					elseif Killroy.tPrefs['bFormatChat'] and (eChannelType == ChatSystemLib.ChatChannel_AnimatedEmote) then
 						xml:AppendText(strText, kstrEmoteColor, strChatFont)
 					else
 						xml:AppendText(strText, crChatText, strChatFont)
@@ -521,7 +555,6 @@ function Killroy:Change_OnChatInputReturn()
 		return false
 	end
 	function aAddon:OnChatInputReturn(wndHandler, wndControl, strText)
-		local prefs = Killroy:GetPreferences()
 		if wndControl:GetName() == "Input" then
 			local wndForm = wndControl:GetParent()
 			strText = self:HelperReplaceLinks(strText, wndControl:GetAllLinks())
@@ -530,7 +563,7 @@ function Killroy:Change_OnChatInputReturn()
 
 			wndControl:SetText("")
 			-- bs:051414, incorporating preferences
-			if not(prefs['bRPModeOnlyEnabled']) then
+			if not(Killroy.tPrefs['bRPOnly']) then
 				if self.eRoleplayOption == 2 then
 					wndControl:SetText(Apollo.GetString("ChatLog_RPMarker"))
 				end
@@ -558,7 +591,7 @@ function Killroy:Change_OnChatInputReturn()
 					end
 				else
 					tChatData.channelCurrent = channelCurrent
-					if self.eRoleplayOption == 2 and prefs['bRPModeOnlyEnabled'] then
+					if self.eRoleplayOption == 2 and Killroy.tPrefs['bRPOnly'] then
 						tInput.strMessage = Apollo.GetString("ChatLog_RPMarker") .. tInput.strMessage
 					end
 					bViewedChannel = self:VerifyChannelVisibility(channelCurrent, tInput, wndForm)
@@ -586,7 +619,6 @@ function Killroy:Change_OnRoleplayBtn()
 		return false
 	end
 	function aAddon:OnRoleplayBtn(wndHandler, wndControl)
-		local prefs = Killroy:GetPreferences()
 		if wndHandler ~= wndControl then
 			return false
 		end
@@ -594,7 +626,7 @@ function Killroy:Change_OnRoleplayBtn()
 		local wndParent = wndControl:GetParent()
 		self.eRoleplayOption = wndParent:GetRadioSel("RoleplayViewToggle")
 		for idx, wndChat in pairs(self.tChatWindows) do
-			if not(prefs['bRPModeOnlyEnabled']) then
+			if not(Killroy.tPrefs['bRPOnly']) then
 				if self.eRoleplayOption == 2 then
 					wndChat:FindChild("Input"):SetText(Apollo.GetString("ChatLog_RPMarker"))
 				else
@@ -611,11 +643,23 @@ end
 -- when the OK button is clicked
 function Killroy:OnOK()
 	self.wndMain:Close() -- hide the window
+	self.tPrefs['bCrossFaction'] = not(self.wndMain:FindChild('bCrossFaction'):IsChecked())
+	self.tPrefs['bRPOnly'] = not(self.wndMain:FindChild('bRPOnly'):IsChecked())
+	self.tPrefs['bFormatChat'] = not(self.wndMain:FindChild('bFormatChat'):IsChecked())
+	self.tPrefs['kstrEmoteColor'] = self.tColorBuffer['kstrEmoteColor']
+	self.tPrefs['kstrSayColor'] = self.tColorBuffer['kstrSayColor']
+	self.tPrefs['kstrOOCColor'] = self.tColorBuffer['kstrOOCColor']
 end
 
 -- when the Cancel button is clicked
 function Killroy:OnCancel()
 	self.wndMain:Close() -- hide the window
+	self.wndMain:FindChild('bCrossFaction'):SetCheck(not(self.tPrefs['bCrossFaction']))
+	self.wndMain:FindChild('bRPOnly'):SetCheck(not(self.tPrefs['bRPOnly']))
+	self.wndMain:FindChild('bFormatChat'):SetCheck(not(self.tPrefs['bFormat']))
+	self.tColorBuffer['kstrEmoteColor'] = self.tPrefs['kstrEmoteColor'] 
+	self.tColorBuffer['kstrSayColor'] = self.tPrefs['kstrSayColor']
+	self.tColorBuffer['kstrOOCColor'] = self.tPrefs['kstrOOCColor']
 end
 
 function Killroy:OnSetOOCColor( wndHandler, wndControl, eMouseButton )
@@ -625,15 +669,6 @@ function Killroy:OnSetEmoteColor( wndHandler, wndControl, eMouseButton )
 end
 
 function Killroy:OnSetSayColor( wndHandler, wndControl, eMouseButton )
-end
-
-function Killroy:ToggleICChat( wndHandler, wndControl, eMouseButton )
-end
-
-function Killroy:ToggleRPOnly( wndHandler, wndControl, eMouseButton )
-end
-
-function Killroy:ToggleCrossFaction( wndHandler, wndControl, eMouseButton )
 end
 
 -----------------------------------------------------------------------------------------------
