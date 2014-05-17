@@ -140,27 +140,31 @@ end
 -- Killroy OnLoad
 -----------------------------------------------------------------------------------------------
 function Killroy:OnLoad()
+    -- load our form file
+	self.xmlDoc = XmlDoc.CreateFromFile("Killroy.xml")
+	self.xmlDoc:RegisterCallback("OnDocumentLoaded", self)
+end
+
+function Killroy:OnDocumentLoaded()
+	self.wndMain = Apollo.LoadForm(self.xmlDoc, "KillroyForm", nil, self)
+	self.wndMain:Show(false, true)
+
 	--register commands and actions
 	Apollo.RegisterSlashCommand("killroy", "OnKillroyOn", self)
 	Apollo.RegisterEventHandler('OnSetEmoteColor', OnSetEmoteColor, self)
 	Apollo.RegisterEventHandler('OnSetSayColor', OnSetEmoteColor, self)
 	Apollo.RegisterEventHandler('OnSetOOCColor', OnSetEmoteColor, self)
-
-
-    -- load our form file
-	self.xmlDoc = XmlDoc.CreateFromFile("Killroy.xml")
+	
 	Apollo.LoadSprites("KIL.xml", "KIL")
-	self.wndMain = Apollo.LoadForm(self.xmlDoc, "KillroyForm", nil, self)
-	self.wndMain:Show(false, true)
+
 	
 	-- replace ChatLogFunctions
 	self:Change_HelperGenerateChatMessage()
 	self:Change_OnChatInputReturn()
 	self:Change_OnRoleplayBtn()
 	
-	GeminiColor = Apollo.GetAddon('GeminiColor')
+	GeminiColor = _G["GeminiPackages"]:GetPackage("GeminiColor-1.0")	
 end
-
 -----------------------------------------------------------------------------------------------
 -- Killroy Functions
 -----------------------------------------------------------------------------------------------
