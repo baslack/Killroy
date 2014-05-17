@@ -18,8 +18,7 @@ require "DatacubeLib"
 -----------------------------------------------------------------------------------------------
 -- Killroy Module Definition
 -----------------------------------------------------------------------------------------------
-local Killroy = {} 
- 
+local Killroy = {}
 -----------------------------------------------------------------------------------------------
 -- Constants
 -----------------------------------------------------------------------------------------------
@@ -91,13 +90,6 @@ local tagEmo = 1
 local tagSay = 2
 local tagOOC = 3
 
-local kstrEmoteColor = 'ffff9900'
-local kstrSayColor = 'ffffffff'
-local kstrOOCColor 	= 'ff7fffb9'
-local bCrossFactionEnabled = true
-local bFormatChatEnabled = true
-local bRPModeOnlyEnabled = true
-
 -----------------------------------------------------------------------------------------------
 -- Initialization
 -----------------------------------------------------------------------------------------------
@@ -138,7 +130,7 @@ function Killroy:Init()
 	local bHasConfigureFunction = true
 	local strConfigureButtonText = "Killroy"
 	local tDependencies = {
-	"ChatLog"
+	"ChatLog",
 	}
     Apollo.RegisterAddon(self, bHasConfigureFunction, strConfigureButtonText, tDependencies)
 end
@@ -148,16 +140,25 @@ end
 -- Killroy OnLoad
 -----------------------------------------------------------------------------------------------
 function Killroy:OnLoad()
+	--register commands and actions
 	Apollo.RegisterSlashCommand("killroy", "OnKillroyOn", self)
+	Apollo.RegisterEventHandler('OnSetEmoteColor', OnSetEmoteColor, self)
+	Apollo.RegisterEventHandler('OnSetSayColor', OnSetEmoteColor, self)
+	Apollo.RegisterEventHandler('OnSetOOCColor', OnSetEmoteColor, self)
+
 
     -- load our form file
 	self.xmlDoc = XmlDoc.CreateFromFile("Killroy.xml")
 	Apollo.LoadSprites("KIL.xml", "KIL")
 	self.wndMain = Apollo.LoadForm(self.xmlDoc, "KillroyForm", nil, self)
 	self.wndMain:Show(false, true)
+	
+	-- replace ChatLogFunctions
 	self:Change_HelperGenerateChatMessage()
 	self:Change_OnChatInputReturn()
 	self:Change_OnRoleplayBtn()
+	
+	GeminiColor = Apollo.GetAddon('GeminiColor')
 end
 
 -----------------------------------------------------------------------------------------------
@@ -169,6 +170,9 @@ function Killroy:OnConfigure()
 	self.wndMain:FindChild('bCrossFaction'):SetCheck(not(self.tPrefs['bCrossFaction']))
 	self.wndMain:FindChild('bRPOnly'):SetCheck(not(self.tPrefs['bRPOnly']))
 	self.wndMain:FindChild('bFormatChat'):SetCheck(not(self.tPrefs['bFormatChat']))
+	self.wndMain:FindChild('setEmoteColor'):SetNormalTextColor(self.tPrefs['kstrEmoteColor'])
+	self.wndMain:FindChild('setSayColor'):SetNormalTextColor(self.tPrefs['kstrSayColor'])
+	self.wndMain:FindChild('setOOCColor'):SetNormalTextColor(self.tPrefs['kstrOOCColor'])
 	self.wndMain:Show(true)
 end
 
@@ -176,6 +180,9 @@ function Killroy:OnKillroyOn()
 	self.wndMain:FindChild('bCrossFaction'):SetCheck(not(self.tPrefs['bCrossFaction']))
 	self.wndMain:FindChild('bRPOnly'):SetCheck(not(self.tPrefs['bRPOnly']))
 	self.wndMain:FindChild('bFormatChat'):SetCheck(not(self.tPrefs['bFormatChat']))
+	self.wndMain:FindChild('setEmoteColor'):SetNormalTextColor(self.tPrefs['kstrEmoteColor'])
+	self.wndMain:FindChild('setSayColor'):SetNormalTextColor(self.tPrefs['kstrSayColor'])
+	self.wndMain:FindChild('setOOCColor'):SetNormalTextColor(self.tPrefs['kstrOOCColor'])
 	self.wndMain:Show(true)
 end
 
@@ -289,11 +296,11 @@ end
 function Killroy:DumpToChat(parsedText, strChatFont, xml)
 	for i,t in ipairs(parsedText) do
 		if t[2] == tagEmo then
-			xml:AppendText(t[1], kstrEmoteColor, strChatFont)
+			xml:AppendText(t[1], self.tPrefs['kstrEmoteColor'], strChatFont)
 		elseif t[2] == tagSay then
-			xml:AppendText(t[1], kstrSayColor, strChatFont)
+			xml:AppendText(t[1], self.tPrefs['kstrSayColor'], strChatFont)
 		elseif t[2] == tagOOC then
-			xml:AppendText(t[1], kstrOOCColor, strChatFont)
+			xml:AppendText(t[1], self.tPrefs['kstrOOCColor'], strChatFont)
 		end
 	end
 	return true
@@ -663,12 +670,33 @@ function Killroy:OnCancel()
 end
 
 function Killroy:OnSetOOCColor( wndHandler, wndControl, eMouseButton )
+	tAddon = Apollo.GetAddon('Killroy')
+	GeminiColor:ShowColorPicker( tAddon, 'OnSetOOCColorOk', true, self.tColorBuffer['kstrOOCColor'])
+end
+
+function Killroy:OnSetOOCColorOk(hexcolor)
+	self.tColorBuffer['kstrOOCColor'] = hexcolor
+	self.wndMain:FindChild('setOOCColor'):SetNormalTextColor(hexcolor)
 end
 
 function Killroy:OnSetEmoteColor( wndHandler, wndControl, eMouseButton )
+	tAddon = Apollo.GetAddon('Killroy')
+	GeminiColor:ShowColorPicker( tAddon, 'OnSetEmoteColorOk', true, self.tColorBuffer['kstrEmoteColor'])
+end
+
+function Killroy:OnSetEmoteColorOk(hexcolor)
+	self.tColorBuffer['kstrEmoteColor'] = hexcolor
+	self.wndMain:FindChild('setEmoteColor'):SetNormalTextColor(hexcolor)
 end
 
 function Killroy:OnSetSayColor( wndHandler, wndControl, eMouseButton )
+	tAddon = Apollo.GetAddon('Killroy')
+	GeminiColor:ShowColorPicker( tAddon, 'OnSetSayColorOk', true, self.tColorBuffer['kstrSayColor'])
+end
+
+function Killroy:OnSetSayColorOk(hexcolor)
+	self.tColorBuffer['kstrSayColor'] = hexcolor
+	self.wndMain:FindChild('setSayColor'):SetNormalTextColor(hexcolor)
 end
 
 -----------------------------------------------------------------------------------------------
