@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------------------------
 -- Client Lua Script for Killroy
--- Copyright (c) NCsoft. All rights reserved
+-- Open Source Licensing granted by Benjamin A. Slack, feel free to use, change or extend.
 -----------------------------------------------------------------------------------------------
  
 require "Apollo"
@@ -143,6 +143,8 @@ function Killroy:OnLoad()
     -- load our form file
 	self.xmlDoc = XmlDoc.CreateFromFile("Killroy.xml")
 	self.xmlDoc:RegisterCallback("OnDocumentLoaded", self)
+	
+	Apollo.LoadSprites("KIL.xml", "KIL")
 end
 
 function Killroy:OnDocumentLoaded()
@@ -154,10 +156,7 @@ function Killroy:OnDocumentLoaded()
 	Apollo.RegisterEventHandler('OnSetEmoteColor', OnSetEmoteColor, self)
 	Apollo.RegisterEventHandler('OnSetSayColor', OnSetEmoteColor, self)
 	Apollo.RegisterEventHandler('OnSetOOCColor', OnSetEmoteColor, self)
-	
-	Apollo.LoadSprites("KIL.xml", "KIL")
 
-	
 	-- replace ChatLogFunctions
 	self:Change_HelperGenerateChatMessage()
 	self:Change_OnChatInputReturn()
@@ -403,7 +402,7 @@ function Killroy:Change_HelperGenerateChatMessage()
 		if eChannelType == ChatSystemLib.ChatChannel_AnimatedEmote then -- emote animated channel gets special formatting
 			-- bs:051414, incorporating preferences variables
 			if Killroy.tPrefs['bFormatChat'] then
-				xml:AddLine(strTime, kstrEmoteColor, self.strFontOption, "Left")
+				xml:AddLine(strTime, Killroy.tPrefs['kstrEmoteColor'], self.strFontOption, "Left")
 			else
 				xml:AddLine(strTime, crChannel, self.strFontOption, "Left")
 			end
@@ -411,7 +410,7 @@ function Killroy:Change_HelperGenerateChatMessage()
 		elseif eChannelType == ChatSystemLib.ChatChannel_Emote then -- emote channel gets special formatting
 			-- bs: 051414, incorporating preferences variables
 			if Killroy.tPrefs['bFormatChat'] then
-				xml:AddLine(strTime, kstrEmoteColor, self.strFontOption, "Left")
+				xml:AddLine(strTime, Killroy.tPrefs['kstrEmoteColor'], self.strFontOption, "Left")
 			else
 				xml:AddLine(strTime, crChannel, self.strFontOption, "Left")
 			end
@@ -507,8 +506,8 @@ function Killroy:Change_HelperGenerateChatMessage()
 				elseif tSegment.uArchiveArticle ~= nil then -- archive article
 					-- replace me with correct colors
 					strText = String_GetWeaselString(Apollo.GetString("CRB_Brackets"), tSegment.uArchiveArticle:GetTitle())
-					crChatText = ApolloColor.new("cyan")
-					crBubbleText = ApolloColor.new("cyan")
+					crChatText = ApolloColor.new("ffb7a767")
+					crBubbleText = ApolloColor.new("ffb7a767")
 
 					tLink.strText = strText
 					tLink.uArchiveArticle = tSegment.uArchiveArticle
@@ -532,7 +531,7 @@ function Killroy:Change_HelperGenerateChatMessage()
 						parsedText = Killroy:ParseForContext(strText, eChannelType)
 						Killroy:DumpToChat(parsedText, strChatFont, xml)
 					elseif Killroy.tPrefs['bFormatChat'] and (eChannelType == ChatSystemLib.ChatChannel_AnimatedEmote) then
-						xml:AppendText(strText, kstrEmoteColor, strChatFont)
+						xml:AppendText(strText, Killroy.tPrefs['kstrEmoteColor'], strChatFont)
 					else
 						xml:AppendText(strText, crChatText, strChatFont)
 					end
@@ -544,7 +543,14 @@ function Killroy:Change_HelperGenerateChatMessage()
 				end
 
 				if xmlBubble then
-					xmlBubble:AppendText(strText, crBubbleText, strBubbleFont) -- Format for bubble; regular
+					if Killroy.tPrefs['bFormatChat'] and ((eChannelType == ChatSystemLib.ChatChannel_Say) or (eChannelType == ChatSystemLib.ChatChannel_Emote)) then
+						parsedText = Killroy:ParseForContext(strText, eChannelType)
+						Killroy:DumpToChat(parsedText, strBubbleFont, xmlBubble)
+					else
+						xmlBubble:AppendText(strText, crBubbleText, strChatFont)
+					end
+					-- bs: 052114, format the chat bubble
+					---xmlBubble:AppendText(strText, crBubbleText, strBubbleFont) -- Format for bubble; regular
 				end
 
 				bHasVisibleText = bHasVisibleText or self:HelperCheckForEmptyString(strText)
