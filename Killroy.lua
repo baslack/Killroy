@@ -123,6 +123,7 @@ function Killroy:new(o)
 			kstrOOCColor 	= self.tPrefs['kstrOOCColor'],
 		}
 	end
+	self.tCLPrefs = {}
     return o
 end
 
@@ -161,6 +162,9 @@ function Killroy:OnDocumentLoaded()
 	self:Change_HelperGenerateChatMessage()
 	self:Change_OnChatInputReturn()
 	self:Change_OnRoleplayBtn()
+	
+	-- 
+	self:SetChatLogPrefs(self.tCLPrefs)
 	
 	GeminiColor = _G["GeminiPackages"]:GetPackage("GeminiColor-1.0")	
 end
@@ -203,7 +207,9 @@ end
 
 function Killroy:OnSave(eLevel)
 	if (eLevel ~= GameLib.CodeEnumAddonSaveLevel.Account) then return nil end
-	return {tPrefs = self.tPrefs,}
+	self.tCLPrefs = GetChatLogPrefs()
+	return {tPrefs = self.tPrefs,
+			tCLPrefs = self.tCLPrefs}
 end
 
 function Killroy:OnRestore(eLevel, tData)
@@ -212,6 +218,53 @@ function Killroy:OnRestore(eLevel, tData)
 			self.tPrefs[i] = v
 		end
 	end
+	
+	if (tData.tCLPrefs ~= nil) then
+		for i,v in pairs(tData.tCLPrefs) do
+			self.tCLPrefs[i] = v
+		end
+	end
+end
+
+function Killroy:SetChatLogPrefs(tCLPrefs)
+	Print ("A\n")
+	ChatLog = Apollo.GetAddon("ChatLog")
+	if ChatLog ~= nil then
+		Print ("B\n")
+		if tCLPrefs ~= nil then
+			Print ("C\n")
+			--Restore ChatLog Prefs From Killroy Backup
+			Print ("tCL Loaded\n")
+			ChatLog.bEnableBGFade = tCLPrefs.bEnableBGFade
+			ChatLog.bEnableNCFade = tCLPrefs.bEnableNCFade
+			ChatLog.nBGOpacity = tCLPrefs.nBGOpacity
+			ChatLog.bShowChannel = tCLPrefs.bShowChannel
+			ChatLog.bShowTimestamp = tCLPrefs.bShowTimestamp
+			ChatLog.bProfanityFilter = tCLPrefs.bProfanityFilter
+			ChatLog.wndChatOptions:FindChild("ProfanityOn"):SetCheck(ChatLog.bProfanityFilter)
+			ChatLog.wndChatOptions:FindChild("ProfanityOff"):SetCheck(not(ChatLog.bProfanityFilter))
+		end
+	end
+end
+
+function Killroy:GetChatLogPrefs()
+	
+	ChatLog = Apollo.GetAddon("ChatLog")
+	
+	if ChatLog == nil then
+		return nil
+	end
+	
+	local ChatLogPrefs = {
+		bEnableBGFade = ChatLog.bEnableBGFade,
+		bEnableNCFade = ChatLog.bEnableNCFade,
+		nBGOpacity = ChatLog.nBGOpacity,
+		bShowChannel = ChatLog.bShowChannel,
+		bShowTimestamp = ChatLog.bShowTimestamp,
+		bProfanityFilter = ChatLog.bProfanityFilter,	
+	}
+	
+	return ChatLogPrefs
 end
 	
 function Killroy:ParseForContext(strText, eChannelType)
