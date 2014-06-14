@@ -19,6 +19,7 @@ require "DatacubeLib"
 -- Killroy Module Definition
 -----------------------------------------------------------------------------------------------
 local Killroy = {}
+local GeminiColor
 -----------------------------------------------------------------------------------------------
 -- Constants
 -----------------------------------------------------------------------------------------------
@@ -151,8 +152,11 @@ function Killroy:OnLoad()
 	
 	Apollo.LoadSprites("KIL.xml", "KIL")
 end
-https://github.com/wildstarnasa/GeminiColor.git
+
 function Killroy:OnDocumentLoaded()
+
+	GeminiColor = Apollo.GetPackage("GeminiColor").tPackage
+	
 	self.wndMain = Apollo.LoadForm(self.xmlDoc, "KillroyForm", nil, self)
 	self.wndMain:Show(false, true)
 
@@ -171,7 +175,6 @@ function Killroy:OnDocumentLoaded()
 	self:Change_OnRoleplayBtn()
 	self:Change_OnConfigure()
 
-	GeminiColor = Apollo.GetPackage("GeminiColor").tPackage	
 end
 -----------------------------------------------------------------------------------------------
 -- Killroy Functions
