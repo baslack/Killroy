@@ -106,6 +106,7 @@ function Killroy:new(o)
 			bCrossFaction = true,
 			bRPOnly = true,
 			bFormatChat = true,
+			bFixChatLog = true,
 			kstrEmoteColor = 'ffff9900',
 			kstrSayColor = 'ffffffff',
 			kstrOOCColor 	= 'ff7fffb9',
@@ -124,11 +125,7 @@ function Killroy:new(o)
 			kstrOOCColor 	= self.tPrefs['kstrOOCColor'],
 		}
 	end
-	
-	if not(self.tCLPrefs) then
-		self.tCLPrefs = {}
-	end
-	
+
     return o
 end
 
@@ -167,14 +164,16 @@ function Killroy:OnDocumentLoaded()
 	Apollo.RegisterEventHandler('OnSetOOCColor', OnSetEmoteColor, self)
 	
 	--timer for overriding ChatLog preferences
-	self.OptionsTimer = ApolloTimer.Create(2, true, "OptionsCheck", self)
-
+	if self.tPrefs['bFixChatLog'] then
+		self.OptionsTimer = ApolloTimer.Create(2, true, "OptionsCheck", self)
+	end
 	-- replace ChatLogFunctions
 	self:Change_HelperGenerateChatMessage()
 	self:Change_OnChatInputReturn()
 	self:Change_OnRoleplayBtn()
-	self:Change_OnConfigure()
-
+	if self.tPrefs['bFixChatLog'] then
+		self:Change_OnConfigure()
+	end
 end
 -----------------------------------------------------------------------------------------------
 -- Killroy Functions
@@ -185,6 +184,7 @@ function Killroy:OnConfigure()
 	self.wndMain:FindChild('bCrossFaction'):SetCheck(not(self.tPrefs['bCrossFaction']))
 	self.wndMain:FindChild('bRPOnly'):SetCheck(not(self.tPrefs['bRPOnly']))
 	self.wndMain:FindChild('bFormatChat'):SetCheck(not(self.tPrefs['bFormatChat']))
+	self.wndMain:FindChild('bFixChatLog'):SetCheck(not(self.tPrefs['bFixChatLog']))
 	self.wndMain:FindChild('setEmoteColor'):SetNormalTextColor(self.tPrefs['kstrEmoteColor'])
 	self.wndMain:FindChild('setSayColor'):SetNormalTextColor(self.tPrefs['kstrSayColor'])
 	self.wndMain:FindChild('setOOCColor'):SetNormalTextColor(self.tPrefs['kstrOOCColor'])
@@ -195,6 +195,7 @@ function Killroy:OnKillroyOn()
 	self.wndMain:FindChild('bCrossFaction'):SetCheck(not(self.tPrefs['bCrossFaction']))
 	self.wndMain:FindChild('bRPOnly'):SetCheck(not(self.tPrefs['bRPOnly']))
 	self.wndMain:FindChild('bFormatChat'):SetCheck(not(self.tPrefs['bFormatChat']))
+	self.wndMain:FindChild('bFixChatLog'):SetCheck(not(self.tPrefs['bFixChatLog']))
 	self.wndMain:FindChild('setEmoteColor'):SetNormalTextColor(self.tPrefs['kstrEmoteColor'])
 	self.wndMain:FindChild('setSayColor'):SetNormalTextColor(self.tPrefs['kstrSayColor'])
 	self.wndMain:FindChild('setOOCColor'):SetNormalTextColor(self.tPrefs['kstrOOCColor'])
@@ -215,8 +216,12 @@ end
 
 function Killroy:OnSave(eLevel)
 	if (eLevel ~= GameLib.CodeEnumAddonSaveLevel.Account) then return nil end
-	return {tPrefs = self.tPrefs,
-			tCLPrefs = self.tCLPrefs,}
+	if self.tPrefs['bFixChatLog'] then
+		return {tPrefs = self.tPrefs,
+				tCLPrefs = self.tCLPrefs,}
+	else
+		return {tPrefs = self.tPrefs,}
+	end
 end
 
 function Killroy:OnRestore(eLevel, tData)
@@ -228,9 +233,9 @@ function Killroy:OnRestore(eLevel, tData)
 	end
 	
 	--ChatLog's Prefs
-	if (tData.tCLPrefs ~= nil) then
-		for i,v in pairs(tData.tCLPrefs) do
-			self.tCLPrefs[i] = v
+	if self.tPrefs['bFixChatLog'] then
+		if (tData.tCLPrefs ~= nil) then
+			self.tCLPrefs = tData.tCLPrefs
 		end
 	end
 end
@@ -238,29 +243,30 @@ end
 function Killroy:OptionsCheck()
 	ChatLog = Apollo.GetAddon("ChatLog")
 	if ChatLog.wndChatOptions then
-		if self.tCLPrefs and (self.tCLPrefs ~= {}) then
-			self:SetChatLogPrefs(self.tCLPrefs)
+		if self.tCLPrefs then
+			--Print ("Killroy: Loading Prefs from Save")
+			self:SetChatLogPrefs()
 		else
+			--Print("No Prefs Saved: Capturing defaults.")
 			self.tCLPrefs = self:GetChatLogPrefs()
 		end
 		self.OptionsTimer:Stop()
 	end
 end
 	
-function Killroy:SetChatLogPrefs(tCLPrefs)
+function Killroy:SetChatLogPrefs()
 	ChatLog = Apollo.GetAddon("ChatLog")
-	if self.tCLPrefs and (self.tCLPrefs ~= {}) then
+	if self.tCLPrefs then
 		--Restore ChatLog Prefs From Killroy Backup
-		if tCLPrefs.bEnableBGFade then
-			ChatLog.bEnableBGFade = tCLPrefs.bEnableBGFade
-			ChatLog.wndChatOptions:FindChild("EnableFadeBtn"):SetCheck(ChatLog.bEnableBGFade)
+		ChatLog.bEnableBGFade = self.tCLPrefs.bEnableBGFade
+		ChatLog.wndChatOptions:FindChild("EnableFadeBtn"):SetCheck(ChatLog.bEnableBGFade)
+	
+		ChatLog.bEnableNCFade = self.tCLPrefs.bEnableNCFade
+		ChatLog.wndChatOptions:FindChild("DisableFadeBtn"):SetCheck(not ChatLog.bEnableBGFade)
 		
-			ChatLog.bEnableNCFade = tCLPrefs.bEnableNCFade
-			ChatLog.wndChatOptions:FindChild("DisableFadeBtn"):SetCheck(not ChatLog.bEnableBGFade)
-		end
 		
-		if tCLPrefs.nBGOpacity then
-			ChatLog.nBGOpacity = tCLPrefs.nBGOpacity
+		if self.tCLPrefs.nBGOpacity then
+			ChatLog.nBGOpacity = self.tCLPrefs.nBGOpacity
 			ChatLog.wndChatOptions:FindChild("BGOpacity:BGOpacitySlider"):SetValue(ChatLog.nBGOpacity)
 		
 			--bs:061214 opacity issue
@@ -280,41 +286,40 @@ function Killroy:SetChatLogPrefs(tCLPrefs)
 			end
 		end
 		
-		if tCLPrefs.nFontSize then
-			ChatLog.nFontSize = tCLPrefs.nFontSize
+		if self.tCLPrefs.nFontSize then
+			ChatLog.nFontSize = self.tCLPrefs.nFontSize
 			ChatLog.wndChatOptions:FindChild("FontSizeSmall"):SetCheck(ChatLog.nFontSize == 1)
 			ChatLog.wndChatOptions:FindChild("FontSizeMedium"):SetCheck(ChatLog.nFontSize == 2)
 			ChatLog.wndChatOptions:FindChild("FontSizeLarge"):SetCheck(ChatLog.nFontSize == 3)
 		end
 		
-		if tCLPrefs.eRoleplayOption then
-			ChatLog.eRoleplayOption = tCLPrefs.eRoleplayOption
+		if self.tCLPrefs.eRoleplayOption then
+			ChatLog.eRoleplayOption = self.tCLPrefs.eRoleplayOption
 			ChatLog.wndChatOptions:FindChild("RoleplayViewToggle_1"):SetCheck(ChatLog.eRoleplayOption == 1)
 			ChatLog.wndChatOptions:FindChild("RoleplayViewToggle_2"):SetCheck(ChatLog.eRoleplayOption == 2)
 			ChatLog.wndChatOptions:FindChild("RoleplayViewToggle_3"):SetCheck(ChatLog.eRoleplayOption == 3)
 		end
 		
-		if tCLPrefs.bShowChannel then
-			ChatLog.bShowChannel = tCLPrefs.bShowChannel
-			ChatLog.wndChatOptions:FindChild("ChannelShow"):SetCheck(ChatLog.bShowChannel)
-			ChatLog.wndChatOptions:FindChild("ChannelShowOff"):SetCheck(not ChatLog.bShowChannel)
-		end
+
+		ChatLog.bShowChannel = self.tCLPrefs.bShowChannel
+		ChatLog.wndChatOptions:FindChild("ChannelShow"):SetCheck(ChatLog.bShowChannel)
+		ChatLog.wndChatOptions:FindChild("ChannelShowOff"):SetCheck(not ChatLog.bShowChannel)
+
 		
-		if tCLPrefs.bShowTimestamp then
-			ChatLog.bShowTimestamp = tCLPrefs.bShowTimestamp
-			ChatLog.wndChatOptions:FindChild("TimestampShow"):SetCheck(ChatLog.bShowTimestamp)
-			ChatLog.wndChatOptions:FindChild("TimestampShowOff"):SetCheck(not ChatLog.bShowTimestamp)
-		end
+		ChatLog.bShowTimestamp = self.tCLPrefs.bShowTimestamp
+		ChatLog.wndChatOptions:FindChild("TimestampShow"):SetCheck(ChatLog.bShowTimestamp)
+		ChatLog.wndChatOptions:FindChild("TimestampShowOff"):SetCheck(not ChatLog.bShowTimestamp)
+
 		
-		if tCLPrefs.bProfanityFilter then
-			ChatLog.bProfanityFilter = tCLPrefs.bProfanityFilter
-			ChatLog.wndChatOptions:FindChild("ProfanityOn"):SetCheck(ChatLog.bProfanityFilter)
-			ChatLog.wndChatOptions:FindChild("ProfanityOff"):SetCheck(not(ChatLog.bProfanityFilter))
-			Apollo.SetConsoleVariable("chat.filter", ChatLog.bProfanityFilter)
-			for idx, channelCurrent in ipairs(ChatSystemLib.GetChannels() or {}) do
-				channelCurrent:SetProfanity(ChatLog.bProfanityFilter)
-			end
+
+		ChatLog.bProfanityFilter = self.tCLPrefs.bProfanityFilter
+		ChatLog.wndChatOptions:FindChild("ProfanityOn"):SetCheck(ChatLog.bProfanityFilter)
+		ChatLog.wndChatOptions:FindChild("ProfanityOff"):SetCheck(not(ChatLog.bProfanityFilter))
+		Apollo.SetConsoleVariable("chat.filter", ChatLog.bProfanityFilter)
+		for idx, channelCurrent in ipairs(ChatSystemLib.GetChannels() or {}) do
+			channelCurrent:SetProfanity(ChatLog.bProfanityFilter)
 		end
+
 	end
 end
 
@@ -472,8 +477,8 @@ function Killroy:Change_OnConfigure()
 	
 		--capture preferences on every window edit
 		Killroy = Apollo.GetAddon("Killroy")
-		if Killroy.tCLPrefs and Killroy then
-			--Print ("Overwriting tCLPrefs")
+		if Killroy then
+			--Print ("Killroy: Gathering ChatLog Preferences")
 			Killroy.tCLPrefs = Killroy:GetChatLogPrefs()
 		end
 	end
@@ -835,6 +840,7 @@ function Killroy:OnOK()
 	self.tPrefs['bCrossFaction'] = not(self.wndMain:FindChild('bCrossFaction'):IsChecked())
 	self.tPrefs['bRPOnly'] = not(self.wndMain:FindChild('bRPOnly'):IsChecked())
 	self.tPrefs['bFormatChat'] = not(self.wndMain:FindChild('bFormatChat'):IsChecked())
+	self.tPrefs['bFixChatLog'] = not(self.wndMain:FindChild('bFixChatLog'):IsChecked())	
 	self.tPrefs['kstrEmoteColor'] = self.tColorBuffer['kstrEmoteColor']
 	self.tPrefs['kstrSayColor'] = self.tColorBuffer['kstrSayColor']
 	self.tPrefs['kstrOOCColor'] = self.tColorBuffer['kstrOOCColor']
@@ -846,6 +852,7 @@ function Killroy:OnCancel()
 	self.wndMain:FindChild('bCrossFaction'):SetCheck(not(self.tPrefs['bCrossFaction']))
 	self.wndMain:FindChild('bRPOnly'):SetCheck(not(self.tPrefs['bRPOnly']))
 	self.wndMain:FindChild('bFormatChat'):SetCheck(not(self.tPrefs['bFormat']))
+	self.wndMain:FindChild('bFixChatLog'):SetCheck(not(self.tPrefs['bFixChatLog']))
 	self.tColorBuffer['kstrEmoteColor'] = self.tPrefs['kstrEmoteColor'] 
 	self.tColorBuffer['kstrSayColor'] = self.tPrefs['kstrSayColor']
 	self.tColorBuffer['kstrOOCColor'] = self.tPrefs['kstrOOCColor']
