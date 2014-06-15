@@ -146,12 +146,10 @@ function Killroy:OnLoad()
     -- load our form file
 	self.xmlDoc = XmlDoc.CreateFromFile("Killroy.xml")
 	self.xmlDoc:RegisterCallback("OnDocumentLoaded", self)
-	
 	Apollo.LoadSprites("KIL.xml", "KIL")
 end
 
 function Killroy:OnDocumentLoaded()
-
 	GeminiColor = Apollo.GetPackage("GeminiColor").tPackage
 	
 	self.wndMain = Apollo.LoadForm(self.xmlDoc, "KillroyForm", nil, self)
@@ -173,6 +171,8 @@ function Killroy:OnDocumentLoaded()
 	self:Change_OnRoleplayBtn()
 	if self.tPrefs['bFixChatLog'] then
 		self:Change_OnConfigure()
+		self:Change_OnBGFade()
+		self:Change_OnBGDrawSlider()
 	end
 end
 -----------------------------------------------------------------------------------------------
@@ -244,10 +244,10 @@ function Killroy:OptionsCheck()
 	ChatLog = Apollo.GetAddon("ChatLog")
 	if ChatLog.wndChatOptions then
 		if self.tCLPrefs then
-			--Print ("Killroy: Loading Prefs from Save")
+			Print ("Killroy: Loading Prefs from Save")
 			self:SetChatLogPrefs()
 		else
-			--Print("No Prefs Saved: Capturing defaults.")
+			Print("No Prefs Saved: Capturing defaults.")
 			self.tCLPrefs = self:GetChatLogPrefs()
 		end
 		self.OptionsTimer:Stop()
@@ -272,17 +272,21 @@ function Killroy:SetChatLogPrefs()
 			--bs:061214 opacity issue
 			for idx, wndChat in ipairs(ChatLog.tChatWindows) do
 				wndChat:SetStyle("AutoFadeNC", ChatLog.bEnableNCFade)
-				if ChatLog.bEnableNCFade then wndChat:SetNCOpacity(ChatLog.nBGOpacity) end
+				if ChatLog.bEnableNCFade then 
+					wndChat:SetNCOpacity(1)
+				else
+					wndChat:SetNCOpacity(ChatLog.nBGOpacity)
+				end
 				
 				wndChat:SetStyle("AutoFadeBG", ChatLog.bEnableBGFade)
-				if ChatLog.bEnableBGFade then wndChat:SetBGOpacity(ChatLog.nBGOpacity) end
+				if ChatLog.bEnableBGFade then 
+					wndChat:SetBGOpacity(1)
+				else
+					wndChat:SetBGOpacity(ChatLog.nBGOpacity)
+				end
 
-				wndChat:FindChild("BGArt"):SetBGColor(CColor.new(1.0, 1.0, 1.0, ChatLog.nBGOpacity))
-				wndChat:FindChild("BGArt_SidePanel"):SetBGColor(CColor.new(1.0, 1.0, 1.0, ChatLog.nBGOpacity))
-				
-				wndChat:FindChild("ChatLine"):SetStyle("UseParentOpacity", false)
-				wndChat:FindChild("ChatLine"):SetBGColor(CColor.new(1.0, 1.0, 1.0, ChatLog.nBGOpacity))
-
+				--wndChat:FindChild("BGArt"):SetBGColor(CColor.new(1.0, 1.0, 1.0, ChatLog.nBGOpacity))
+				--wndChat:FindChild("BGArt_SidePanel"):SetBGColor(CColor.new(1.0, 1.0, 1.0, ChatLog.nBGOpacity))
 			end
 		end
 		
@@ -478,12 +482,69 @@ function Killroy:Change_OnConfigure()
 		--capture preferences on every window edit
 		Killroy = Apollo.GetAddon("Killroy")
 		if Killroy then
-			--Print ("Killroy: Gathering ChatLog Preferences")
 			Killroy.tCLPrefs = Killroy:GetChatLogPrefs()
+			Killroy:SetChatLogPrefs()
 		end
 	end
 end
 
+function Killroy:Change_OnBGFade()
+	local ChatLog = Apollo.GetAddon("ChatLog")
+	if ChatLog == nil then
+		return false
+	end
+	
+	function ChatLog:OnBGFade(wndHandler, wndControl)
+		local wndParent = wndControl:GetParent()
+		self.bEnableBGFade = wndControl:GetData()
+		self.bEnableNCFade = wndControl:GetData()
+
+		for idx, wndChatWindow in pairs(self.tChatWindows) do
+			wndChatWindow:SetStyle("AutoFadeNC", self.bEnableNCFade)
+			if self.bEnableNCFade then 
+				wndChatWindow:SetNCOpacity(1)
+			elseif self.nBGOpacity then
+				wndChatWindow:SetNCOpacity(self.nBGOpacity)
+			else
+				wndChatWindow:SetNCOpacity(1)
+			end
+
+			wndChatWindow:SetStyle("AutoFadeBG", self.bEnableBGFade)
+			if self.bEnableBGFade then 
+				wndChatWindow:SetBGOpacity(1)
+			elseif self.nBGOpacity then
+				wndChatWindow:SetBGOpacity(self.nBGOpacity)
+			else
+				wndChatWindow:SetBGOpacity(1)
+			end
+		end
+	end
+end
+
+function Killroy:Change_OnBGDrawSlider()
+	ChatLog = Apollo.GetAddon("ChatLog")
+	if ChatLog == nil then
+		return false
+	end
+	
+	function ChatLog:OnBGDrawSlider(wndHandler, wndControl)
+		self.nBGOpacity = self.wndChatOptions:FindChild("BGOpacity:BGOpacitySlider"):GetValue()
+
+		for idx, wndChatWindow in pairs(self.tChatWindows) do
+			if self.bEnableNCFade then 
+				wndChatWindow:SetNCOpacity(1)
+			else
+				wndChatWindow:SetNCOpacity(self.nBGOpacity)
+			end
+			
+			if self.bEnableBGFade then 
+				wndChatWindow:SetBGOpacity(1)
+			else
+				wndChatWindow:SetBGOpacity(self.nBGOpacity)
+			end
+		end
+	end
+end
 
 
 function Killroy:Change_HelperGenerateChatMessage()
