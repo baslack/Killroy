@@ -107,6 +107,11 @@ function Killroy:new(o)
 			bRPOnly = true,
 			bFormatChat = true,
 			bFixChatLog = true,
+			bRangeFilter = true,
+			nSayRange = 30,
+			nEmoteRange = 60,
+			nFalloff = 5,
+			bUseOcclusion = true,
 			kstrEmoteColor = 'ffff9900',
 			kstrSayColor = 'ffffffff',
 			kstrOOCColor 	= 'ff7fffb9',
@@ -244,10 +249,10 @@ function Killroy:OptionsCheck()
 	ChatLog = Apollo.GetAddon("ChatLog")
 	if ChatLog.wndChatOptions then
 		if self.tCLPrefs then
-			Print ("Killroy: Loading Prefs from Save")
+			--Print ("Killroy: Loading Prefs from Save")
 			self:SetChatLogPrefs()
 		else
-			Print("No Prefs Saved: Capturing defaults.")
+			--Print("No Prefs Saved: Capturing defaults.")
 			self.tCLPrefs = self:GetChatLogPrefs()
 		end
 		self.OptionsTimer:Stop()
@@ -466,6 +471,117 @@ function Killroy:DumpToChat(parsedText, strChatFont, xml)
 	end
 	return true
 end
+
+-- TB's contribution to the range filter code, edits by bs:061914
+
+function Killroy:Distance(unitTarget)
+    local unitPlayer = GameLib.GetPlayerUnit()
+    if type(unitTarget) == "string" then
+        unitTarget = GameLib.GetPlayerUnitByName(unitTarget)
+    end
+
+    if not unitTarget or not unitPlayer then
+        return 0
+    end
+
+    tPosTarget = unitTarget:GetPosition()
+    tPosPlayer = unitPlayer:GetPosition()
+
+    if tPosTarget == nil or tPosPlayer == nil then
+        return 0
+    end
+
+    local nDeltaX = tPosTarget.x - tPosPlayer.x
+    local nDeltaY = tPosTarget.y - tPosPlayer.y
+    local nDeltaZ = tPosTarget.z - tPosPlayer.z
+
+    local nDistance = math.floor(math.sqrt((nDeltaX ^ 2) + (nDeltaY ^ 2) + (nDeltaZ ^ 2)))
+
+	return nDistance
+end
+
+function Killroy:Occluded(unitTarget)
+    if type(unitTarget) == "string" then
+        unitTarget = GameLib.GetPlayerUnitByName(unitTarget)
+    end
+
+    if not unitTarget then 
+		return nil
+	else 
+		return unitTarget:IsOccluded()
+	end
+ end
+
+function Killroy:RangeFilter(sMessage, sSender, eChannelType)
+	--[[
+	I. Context, does the messsage contain the player's name?
+		A. if so, half the range
+	II. Occlusion, doesn't stop sound, stops sight
+		A. if channel is "say", then double range if occluded
+		B. if channel is emote or animated emote, cull message
+	III. check range
+		A. if greater than range + falloff, cut off message
+		B. if between range and fallor, garble message
+		C. if less than or equal to range show message
+	]]--
+	
+	function Garble(sMessage, nMin, nRange, nMax)
+		local nGarbleQuotient = (nRange-nMin)/(nMax-nMin)
+		local nCount = 0
+		local tWordStack = {}
+		for word in string.gmatch(sMessage, "%g+") do
+			nCount = nCount + 1
+			tWordStack[nCount] = word
+		end
+		local nGarbleTries
+		
+		
+	end
+	
+	local nRange = self:Distance(sSender)
+	local sPlayer = GameLib:GetPlayerUnit():GetName()
+	local bContext = false
+	for word in string.gmatch(sMessage, "%g+") do
+		if word == sPlayer then
+			bContext = true
+		end
+	end
+	if bContext then nRange = nRange / 2 
+	
+	if self.tPrefs["bUseOcclusion"] then
+		if GameLib:GetPlayerUnitByName("sSender"):IsOccluded() then
+			if eChannelType == ChatSystemLib.ChatChannel_Say then
+				nRange = nRange * 2
+			elseif eChannelType == ChatSystemLib.ChatChannel_Emote then
+				return nil
+			elseif eChannelType == ChatSystemLib.ChatChannel_AnimatedEmote then
+				return nil
+			end
+		end
+	end
+	
+	local nMaxRange
+	local nMinRange
+	
+	if eChannelType == ChatSystemLib.ChatChannel_Say then
+		nMaxRange = self.tPrefs["nSayRange"] + self.tPrefs["nFalloff"]
+		nMinRange = self.tPrefs["nSayRange"]
+	end
+	
+	if eChannelType == ChatSystemLib.ChatChannel_Emote or eChannelType == ChatSystemLib.ChatChannel_AnimatedEmote then
+		nMaxRange = self.tPrefs["nEmoteRange"] + self.tPrefs["nFalloff"]
+		nMinRange = self.tPrefs["nEmoteRange"]
+	end
+		
+	if nRange > nMaxRange then return nil end
+	elseif nMaxRange >= nRange > nMinRange then
+		return Garble(sMessage, nMinRange, nRange, nMaxRange)
+	elseif nMinRange >= nRange then
+		return sMessage
+	end
+end 
+
+-- Killroy Change Methods, these replace ChatLog methods
 
 function Killroy:Change_OnConfigure()
 	local ChatLog = Apollo.GetAddon("ChatLog")
@@ -947,6 +1063,9 @@ end
 function Killroy:OnSetSayColorOk(hexcolor)
 	self.tColorBuffer['kstrSayColor'] = hexcolor
 	self.wndMain:FindChild('setSayColor'):SetNormalTextColor(hexcolor)
+end
+
+function Killroy:OnRangeSlider( wndHandler, wndControl, fNewValue, fOldValue )
 end
 
 -----------------------------------------------------------------------------------------------
