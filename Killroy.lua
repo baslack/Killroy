@@ -342,6 +342,38 @@ function Killroy:Distance(unitTarget)
 	return nDistance
 end
 
+function Killroy:Garble(sMessage, nMin, nRange, nMax)
+	Print("sMessage:"..sMessage)
+	local nGarbleQuotient = (nRange-nMin)/(nMax-nMin)
+	Print("nGarbleQuotient:" .. tostring(nGarbleQuotient))
+	local nCount = 0
+	local tWordStack = {}
+	for word in string.gmatch(sMessage, "[^%s]+") do
+		Print("word:" .. word)
+		nCount = nCount + 1
+		tWordStack[nCount] = word
+	end
+	Print("nCount:" .. tostring(nCount))
+	Print("tWorkStack:" .. table.concat(tWordStack))
+	local nGarbleTries = math.floor(nCount * nGarbleQuotient)
+	Print ("nGarbleTries:" .. tostring(nGarbleTries))
+	local sGarble = "..."
+	for nTry = 1, nGarbleTries, 1 do
+		local idx = math.random(nCount)
+		Print("idx:" .. tostring(idx))
+		tWordStack[idx] = sGarble
+	end
+	local sReturn = ""
+	for nIdx = 1, nCount, 1 do
+		sReturn = sReturn .. tWordStack[nIdx]
+		if nIdx ~= nCount then
+			sReturn = sReturn .. " "
+		end 
+		Print("nIdx:" .. tostring(nIdx) .. ", sReturn:" .. sReturn)
+	end
+	return sReturn
+end
+
 function Killroy:RangeFilter(sMessage, sSender, eChannelType)
 	--[[
 	I. Context, does the messsage contain the player's name?
@@ -355,31 +387,21 @@ function Killroy:RangeFilter(sMessage, sSender, eChannelType)
 		C. if less than or equal to range show message
 	]]--
 	
-	function Garble(sMessage, nMin, nRange, nMax)
-		local nGarbleQuotient = (nRange-nMin)/(nMax-nMin)
-		local nCount = 0
-		local tWordStack = {}
-		for word in string.gmatch(sMessage, "%g+") do
-			nCount = nCount + 1
-			tWordStack[nCount] = word
-		end
-		local nGarbleTries
-		
-		
-	end
-	
 	local nRange = self:Distance(sSender)
-	local sPlayer = GameLib:GetPlayerUnit():GetName()
+	if sSender == "Xaeka" then nRange = self.tPrefs["nSayRange"] + 4 end
+	Print("nRange:"..tostring(nRange))
+	local sPlayer = GameLib.GetPlayerUnit():GetName()
+	Print("sPlayer:"..sPlayer..", sSender:"..sSender..", eChannelType:"..tostring(eChannelType))
 	local bContext = false
 	for word in string.gmatch(sMessage, "%g+") do
 		if word == sPlayer then
 			bContext = true
 		end
 	end
-	if bContext then nRange = nRange / 2 
+	if bContext then nRange = nRange / 2 end
 	
 	if self.tPrefs["bUseOcclusion"] then
-		if GameLib:GetPlayerUnitByName("sSender"):IsOccluded() then
+		if GameLib.GetPlayerUnitByName(sSender):IsOccluded() then
 			if eChannelType == ChatSystemLib.ChatChannel_Say then
 				nRange = nRange * 2
 			elseif eChannelType == ChatSystemLib.ChatChannel_Emote then
@@ -389,23 +411,29 @@ function Killroy:RangeFilter(sMessage, sSender, eChannelType)
 			end
 		end
 	end
+	local nMaxRange = 0
+	local nMinRange = 0
 	
-	local nMaxRange
-	local nMinRange
+	Print("nMaxRange:"..tostring(nMaxRange)..", nMinRange:"..tostring(nMinRange))
 	
 	if eChannelType == ChatSystemLib.ChatChannel_Say then
 		nMaxRange = self.tPrefs["nSayRange"] + self.tPrefs["nFalloff"]
 		nMinRange = self.tPrefs["nSayRange"]
 	end
-	
-	if eChannelType == ChatSystemLib.ChatChannel_Emote or eChannelType == ChatSystemLib.ChatChannel_AnimatedEmote then
+	if (eChannelType == ChatSystemLib.ChatChannel_Emote) or (eChannelType == ChatSystemLib.ChatChannel_AnimatedEmote) then
 		nMaxRange = self.tPrefs["nEmoteRange"] + self.tPrefs["nFalloff"]
 		nMinRange = self.tPrefs["nEmoteRange"]
 	end
+	
+	Print("nMaxRange:"..tostring(nMaxRange)..", nMinRange:"..tostring(nMinRange))
 		
-	if nRange > nMaxRange then return nil end
-	elseif nMaxRange >= nRange > nMinRange then
-		return Garble(sMessage, nMinRange, nRange, nMaxRange)
+	if (nRange > nMaxRange) then return nil
+	elseif (nMaxRange >= nRange) and (nRange > nMinRange) then
+		if eChannelType == ChatSystemLib.ChatChannel_Say then
+			return self:Garble(sMessage, nMinRange, nRange, nMaxRange)
+		elseif eChannelType == ChatSystemLib.ChatChannel_Emote or eChannelType == ChatSystemLib.ChatChannel_AnimatedEmote then
+			return "does something... but you can't quite make it out."
+		end
 	elseif nMinRange >= nRange then
 		return sMessage
 	end
@@ -427,6 +455,23 @@ function Killroy:Change_HelperGenerateChatMessage()
 		local eChannelType = tQueuedMessage.eChannelType
 		local tMessage = tQueuedMessage.tMessage
 
+		-- Killroy Range Filter Hooks
+		local Killroy = Apollo.GetAddon("Killroy")
+		if not(Killroy) then return end
+		
+		-- Only engage the filter with say, emote and animated emotes
+		if (eChannelType == ChatSystemLib.ChatChannel_Say) or (eChannelType == ChatSystemLib.ChatChannel_Emote) or (eChannelType == ChatSystemLib.ChatChannel_AnimatedEmote) then
+			Print ("Fire!")
+			if Killroy.tPrefs["bRangeFilter"] then
+				for idx, tSegment in ipairs( tMessage.arMessageSegments ) do
+					local strText = tSegment.strText
+					strText = Killroy:RangeFilter(strText, tMessage.unitSource:GetName(), eChannelType)
+					tSegment.strText = strText
+					if strText == nil then return end
+				end
+			end	
+		end
+		
 		-- Different handling for combat log
 		if eChannelType == ChatSystemLib.ChatChannel_Combat then
 			-- no formats in combat, roll it all up into one.
