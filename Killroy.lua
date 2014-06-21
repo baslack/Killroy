@@ -106,7 +106,7 @@ function Killroy:new(o)
 			bCrossFaction = true,
 			bRPOnly = true,
 			bFormatChat = true,
-			bFixChatLog = true,
+			bFixChatLog = false,
 			bRangeFilter = true,
 			nSayRange = 30,
 			nEmoteRange = 60,
@@ -952,9 +952,9 @@ function Killroy:Change_OnChatInputReturn()
 					if tInput.bValidCommand then -- good command
 						ChatSystemLib.Command( strText )
 					else	-- bad command
-						local strFailString = String_GetWeaselString(Apollo.GetString("ChatLog_UnknownCommand"), Apollo.GetString("CombatFloaterType_Error"), tInput.strCommand)
+						local strFailString = String_GetWeaselString(Apollo.GetString("ChatLog_UnknownCommand"), Apollo.GetString("CombatFloaterType_Error"), {strLiteral = tInput.strCommand})
 						ChatSystemLib.PostOnChannel( ChatSystemLib.ChatChannel_Command, strFailString, "" )
-						wndInput:SetText(String_GetWeaselString(Apollo.GetString("ChatLog_MessageToPlayer"), tInput.strCommand, tInput.strMessage))
+						wndInput:SetText(String_GetWeaselString(Apollo.GetString("ChatLog_MessageToPlayer"), {strLiteral = tInput.strCommand}, {strLiteral = tInput.strMessage}))
 						wndInput:SetFocus()
 						local strSubmitted = wndForm:FindChild("Input"):GetText()
 						wndInput:SetSel(strSubmitted:len(), -1)
@@ -970,9 +970,9 @@ function Killroy:Change_OnChatInputReturn()
 			end
 
 			local crText = self.arChatColor[tChatData.channelCurrent:GetType()] or ApolloColor.new("white")
-			local wndInputType = wndForm:FindChild("InputTypeBtn:InputType")
+			local wndInputType = wndForm:FindChild("InputType")
 			wndForm:GetData().crText = crText
-			wndForm:FindChild("InputTypeBtn:InputType"):SetTextColor(crText)
+			wndForm:FindChild("InputType"):SetTextColor(crText)
 			wndInput:SetTextColor(crText)
 			wndInputType:SetText(tChatData.channelCurrent:GetCommand())
 
