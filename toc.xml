@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Addon Author="Scriptorium" APIVersion="8" Name="Killroy" Description="Replaces several methods from the default Carbine ChatLog addon to allow for cross faction communication and a more user friendly RP filter experience." Version="1-2-0">
+<Addon Author="Scriptorium" APIVersion="8" Name="Killroy" Description="Replaces several methods from the default Carbine ChatLog addon to allow for cross faction communication and a more user friendly RP filter experience." Version="1-2-3">
     <Script Name="Killroy.lua"/>
     <Form Name="Killroy.xml"/>
-	<Script Name="GeminiColor\GeminiColor.lua"/>
-	<Form Name="GeminiColor\GeminiColor.xml"/>
+    <Script Name="GeminiColor\GeminiColor.lua"/>
+    <Form Name="GeminiColor\GeminiColor.xml"/>
 </Addon>

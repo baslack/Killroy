@@ -91,6 +91,13 @@ local tagEmo = 1
 local tagSay = 2
 local tagOOC = 3
 
+local knDefaultSayRange = 30
+local knDefaultEmoteRange = 60
+local knDefaultFalloff = 5
+local ksDefaultEmoteColor = 'ffff9900'
+local ksDefaultSayColor = 'ffffffff'
+local ksDefaultOOCColor = 'ff7fffb9'
+
 -----------------------------------------------------------------------------------------------
 -- Initialization
 -----------------------------------------------------------------------------------------------
@@ -107,19 +114,24 @@ function Killroy:new(o)
 			bRPOnly = true,
 			bFormatChat = true,
 			bRangeFilter = true,
-			nSayRange = 30,
-			nEmoteRange = 60,
-			nFalloff = 5,
+			nSayRange = knDefaultSayRange,
+			nEmoteRange = knDefaultEmoteRange,
+			nFalloff = knDefaultFalloff,
 			bUseOcclusion = true,
-			kstrEmoteColor = 'ffff9900',
-			kstrSayColor = 'ffffffff',
-			kstrOOCColor 	= 'ff7fffb9',
+			kstrEmoteColor = ksDefaultEmoteColor,
+			kstrSayColor = ksDefaultSayColor,
+			kstrOOCColor 	= ksDefaultOOCColor,
 		}
 		self.tColorBuffer = 
 		{
-			kstrEmoteColor = 'ffff9900',
-			kstrSayColor = 'ffffffff',
-			kstrOOCColor 	= 'ff7fffb9',
+			kstrEmoteColor = ksDefaultEmoteColor,
+			kstrSayColor = ksDefaultSayColor,
+			kstrOOCColor 	= ksDefaultOOCColor,
+		}
+		self.tRFBuffer = {
+			nSayRange = knDefaultSayRange,
+			nEmoteRange = knDefaultEmoteRange,
+			nFalloff = knDefaultFalloff,
 		}
 	else
 		self.tColorBuffer = 
@@ -127,6 +139,12 @@ function Killroy:new(o)
 			kstrEmoteColor = self.tPrefs['kstrEmoteColor'],
 			kstrSayColor = self.tPrefs['kstrSayColor'],
 			kstrOOCColor 	= self.tPrefs['kstrOOCColor'],
+		}
+		self.tRFBuffer =
+		{
+			nSayRange = self.tPrefs['nSayRange'],
+			nEmoteRange = self.tPrefs['nEmoteRange'],
+			nFalloff = self.tPrefs['nFalloff'],
 		}
 	end
 
@@ -184,19 +202,17 @@ function Killroy:OnConfigure()
 	self.wndMain:FindChild('setEmoteColor'):SetNormalTextColor(self.tPrefs['kstrEmoteColor'])
 	self.wndMain:FindChild('setSayColor'):SetNormalTextColor(self.tPrefs['kstrSayColor'])
 	self.wndMain:FindChild('setOOCColor'):SetNormalTextColor(self.tPrefs['kstrOOCColor'])
+	self.wndMain:FindChild('nSayRange'):SetValue(self.tPrefs['nSayRange'])
+	self.tRFBuffer['nSayRange'] = self.tPrefs['nSayRange']
+	self.wndMain:FindChild('nEmoteRange'):SetValue(self.tPrefs['nEmoteRange'])
+	self.tRFBuffer['nEmoteRange'] = self.tPrefs['nEmoteRange']
+	self.wndMain:FindChild('nFalloff'):SetValue(self.tPrefs['nFalloff'])
+	self.tRFBuffer['nFalloff'] = self.tPrefs['nFalloff']
 	self.wndMain:Show(true)
 end
 
 function Killroy:OnKillroyOn()
-	self.wndMain:FindChild('bCrossFaction'):SetCheck(not(self.tPrefs['bCrossFaction']))
-	self.wndMain:FindChild('bRPOnly'):SetCheck(not(self.tPrefs['bRPOnly']))
-	self.wndMain:FindChild('bFormatChat'):SetCheck(not(self.tPrefs['bFormatChat']))
-	self.wndMain:FindChild('bRangeFilter'):SetCheck(not(self.tPrefs['bFormatChat']))
-	self.wndMain:FindChild('bUseOcclusion'):SetCheck(not(self.tPrefs['bFormatChat']))
-	self.wndMain:FindChild('setEmoteColor'):SetNormalTextColor(self.tPrefs['kstrEmoteColor'])
-	self.wndMain:FindChild('setSayColor'):SetNormalTextColor(self.tPrefs['kstrSayColor'])
-	self.wndMain:FindChild('setOOCColor'):SetNormalTextColor(self.tPrefs['kstrOOCColor'])
-	self.wndMain:Show(true)
+	self:OnConfigure()
 end
 
 function Killroy:GetPreferences()
@@ -343,24 +359,17 @@ function Killroy:Distance(unitTarget)
 end
 
 function Killroy:Garble(sMessage, nMin, nRange, nMax)
-	Print("sMessage:"..sMessage)
 	local nGarbleQuotient = (nRange-nMin)/(nMax-nMin)
-	Print("nGarbleQuotient:" .. tostring(nGarbleQuotient))
 	local nCount = 0
 	local tWordStack = {}
 	for word in string.gmatch(sMessage, "[^%s]+") do
-		Print("word:" .. word)
 		nCount = nCount + 1
 		tWordStack[nCount] = word
 	end
-	Print("nCount:" .. tostring(nCount))
-	Print("tWorkStack:" .. table.concat(tWordStack))
 	local nGarbleTries = math.floor(nCount * nGarbleQuotient)
-	Print ("nGarbleTries:" .. tostring(nGarbleTries))
 	local sGarble = "..."
 	for nTry = 1, nGarbleTries, 1 do
 		local idx = math.random(nCount)
-		Print("idx:" .. tostring(idx))
 		tWordStack[idx] = sGarble
 	end
 	local sReturn = ""
@@ -369,10 +378,27 @@ function Killroy:Garble(sMessage, nMin, nRange, nMax)
 		if nIdx ~= nCount then
 			sReturn = sReturn .. " "
 		end 
-		Print("nIdx:" .. tostring(nIdx) .. ", sReturn:" .. sReturn)
 	end
 	return sReturn
 end
+
+function Killroy:Myoptic()
+	local tResponses = {
+						"does something, but you can't make it out from here.",
+						"waves? You think they waved.",
+						"might have just flipped you off, but you couldn't really see from here.",
+						"is too far away to see exactly what they're up to.",
+						"appears to be talking animatedly, but you make out a word of it.",
+						"apparently has something on their mind. Maybe you should go see what?",
+						"looks like they want something. Maybe you should investigate?",
+						"says something, but you can't overhear it.",
+						"has an incredibly huge butt... wait, did you hear that right?",
+						"is just to far away to make out.",
+						}
+						
+	return tResponses[math.random(10)]
+end
+						
 
 function Killroy:RangeFilter(sMessage, sSender, eChannelType)
 	--[[
@@ -387,11 +413,12 @@ function Killroy:RangeFilter(sMessage, sSender, eChannelType)
 		C. if less than or equal to range show message
 	]]--
 	
+	if not sMessage then
+		return nil
+	end
+	
 	local nRange = self:Distance(sSender)
-	if sSender == "Xaeka" then nRange = self.tPrefs["nSayRange"] + 4 end
-	Print("nRange:"..tostring(nRange))
 	local sPlayer = GameLib.GetPlayerUnit():GetName()
-	Print("sPlayer:"..sPlayer..", sSender:"..sSender..", eChannelType:"..tostring(eChannelType))
 	local bContext = false
 	for word in string.gmatch(sMessage, "%g+") do
 		if word == sPlayer then
@@ -414,8 +441,6 @@ function Killroy:RangeFilter(sMessage, sSender, eChannelType)
 	local nMaxRange = 0
 	local nMinRange = 0
 	
-	Print("nMaxRange:"..tostring(nMaxRange)..", nMinRange:"..tostring(nMinRange))
-	
 	if eChannelType == ChatSystemLib.ChatChannel_Say then
 		nMaxRange = self.tPrefs["nSayRange"] + self.tPrefs["nFalloff"]
 		nMinRange = self.tPrefs["nSayRange"]
@@ -425,14 +450,12 @@ function Killroy:RangeFilter(sMessage, sSender, eChannelType)
 		nMinRange = self.tPrefs["nEmoteRange"]
 	end
 	
-	Print("nMaxRange:"..tostring(nMaxRange)..", nMinRange:"..tostring(nMinRange))
-		
 	if (nRange > nMaxRange) then return nil
 	elseif (nMaxRange >= nRange) and (nRange > nMinRange) then
 		if eChannelType == ChatSystemLib.ChatChannel_Say then
 			return self:Garble(sMessage, nMinRange, nRange, nMaxRange)
 		elseif eChannelType == ChatSystemLib.ChatChannel_Emote or eChannelType == ChatSystemLib.ChatChannel_AnimatedEmote then
-			return "does something... but you can't quite make it out."
+			return self.Myoptic()
 		end
 	elseif nMinRange >= nRange then
 		return sMessage
@@ -459,9 +482,21 @@ function Killroy:Change_HelperGenerateChatMessage()
 		local Killroy = Apollo.GetAddon("Killroy")
 		if not(Killroy) then return end
 		
-		-- Only engage the filter with say, emote and animated emotes
-		if (eChannelType == ChatSystemLib.ChatChannel_Say) or (eChannelType == ChatSystemLib.ChatChannel_Emote) or (eChannelType == ChatSystemLib.ChatChannel_AnimatedEmote) then
-			Print ("Fire!")
+		-- Only engage the filter with say, emote and animated emotes, and if the message is not the players own
+		
+		local bPlayerTest
+		if tMessage.unitSource then
+			bPlayerTest = not (GameLib.GetPlayerUnit():GetName() == tMessage.unitSource:GetName())
+		else
+			bPlayerTest = true
+		end
+		
+		local bChannelTest1 = eChannelType == ChatSystemLib.ChatChannel_Say
+		local bChannelTest2 = eChannelType == ChatSystemLib.ChatChannel_Emote
+		local bChannelTest3 = eChannelType == ChatSystemLib.ChatChannel_AnimatedEmote
+		local bChannelTest = bChannelTest1 or bChannelTest2 or bChannelTest3
+		
+		if bPlayerTest and bChannelTest then
 			if Killroy.tPrefs["bRangeFilter"] then
 				for idx, tSegment in ipairs( tMessage.arMessageSegments ) do
 					local strText = tSegment.strText
@@ -812,11 +847,14 @@ function Killroy:OnOK()
 	self.tPrefs['bCrossFaction'] = not(self.wndMain:FindChild('bCrossFaction'):IsChecked())
 	self.tPrefs['bRPOnly'] = not(self.wndMain:FindChild('bRPOnly'):IsChecked())
 	self.tPrefs['bFormatChat'] = not(self.wndMain:FindChild('bFormatChat'):IsChecked())
-	self.tPrefs['bRangeFilter'] = not(self.wndMain:FindChild('bFormatChat'):IsChecked())
-	self.tPrefs['bUseOcclusion'] = not(self.wndMain:FindChild('bFormatChat'):IsChecked())
+	self.tPrefs['bRangeFilter'] = not(self.wndMain:FindChild('bRangeFilter'):IsChecked())
+	self.tPrefs['bUseOcclusion'] = not(self.wndMain:FindChild('bUseOcclusion'):IsChecked())
 	self.tPrefs['kstrEmoteColor'] = self.tColorBuffer['kstrEmoteColor']
 	self.tPrefs['kstrSayColor'] = self.tColorBuffer['kstrSayColor']
 	self.tPrefs['kstrOOCColor'] = self.tColorBuffer['kstrOOCColor']
+	self.tPrefs['nSayRange'] = self.tRFBuffer['nSayRange']
+	self.tPrefs['nEmoteRange'] = self.tRFBuffer['nEmoteRange']
+	self.tPrefs['nFalloff'] = self.tRFBuffer['nFalloff']
 end
 
 -- when the Cancel button is clicked
@@ -825,11 +863,14 @@ function Killroy:OnCancel()
 	self.wndMain:FindChild('bCrossFaction'):SetCheck(not(self.tPrefs['bCrossFaction']))
 	self.wndMain:FindChild('bRPOnly'):SetCheck(not(self.tPrefs['bRPOnly']))
 	self.wndMain:FindChild('bFormatChat'):SetCheck(not(self.tPrefs['bFormat']))
-	self.wndMain:FindChild('bRangeFilter'):SetCheck(not(self.tPrefs['bFormat']))
-	self.wndMain:FindChild('bUseOcclusion'):SetCheck(not(self.tPrefs['bFormat']))
+	self.wndMain:FindChild('bRangeFilter'):SetCheck(not(self.tPrefs['bRangeFilter']))
+	self.wndMain:FindChild('bUseOcclusion'):SetCheck(not(self.tPrefs['bUseOcclusion']))
 	self.tColorBuffer['kstrEmoteColor'] = self.tPrefs['kstrEmoteColor'] 
 	self.tColorBuffer['kstrSayColor'] = self.tPrefs['kstrSayColor']
 	self.tColorBuffer['kstrOOCColor'] = self.tPrefs['kstrOOCColor']
+	self.tRFBuffer['nSayRange'] = self.tPrefs['nSayRange']
+	self.tRFBuffer['nEmoteRange'] = self.tPrefs['nEmoteRange']
+	self.tRFBuffer['nFalloff'] = self.tPrefs['nFalloff']
 end
 
 function Killroy:OnSetOOCColor( wndHandler, wndControl, eMouseButton )
@@ -863,6 +904,8 @@ function Killroy:OnSetSayColorOk(hexcolor)
 end
 
 function Killroy:OnRangeSlider( wndHandler, wndControl, fNewValue, fOldValue )
+	sName = wndControl:GetName()
+	self.tRFBuffer[sName] = fNewValue
 end
 
 -----------------------------------------------------------------------------------------------
