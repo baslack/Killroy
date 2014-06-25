@@ -9,4 +9,4 @@ replacements, based of my conversations with user "Togglebutton" at Wildstar Rol
 implement automatic emote and say formatting for quotes. Finally, I may do some integration with RPCore to pull
 character names from the RPCore data.
 
-Questions and change requests to me, Benjamin A. Slack AKA Scriptorium, iam@nimajneb.com
+Questions and change requests to me, Scriptorium, iam@nimajneb.com
