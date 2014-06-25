@@ -187,6 +187,7 @@ function Killroy:OnDocumentLoaded()
 	self:Change_HelperGenerateChatMessage()
 	self:Change_OnChatInputReturn()
 	self:Change_OnRoleplayBtn()
+	self:Change_OnChatMessage()
 end
 -----------------------------------------------------------------------------------------------
 -- Killroy Functions
@@ -418,6 +419,12 @@ function Killroy:RangeFilter(sMessage, sSender, eChannelType)
 	end
 	
 	local nRange = self:Distance(sSender)
+	
+	local bEnableDebug = false
+	if bEnableDebug then
+		if sSender == GameLib.GetPlayerUnit():GetName() then nRange = self.tPrefs['nSayRange'] + 6 end
+	end
+	
 	local sPlayer = GameLib.GetPlayerUnit():GetName()
 	local bContext = false
 	for word in string.gmatch(sMessage, "%g+") do
@@ -464,6 +471,106 @@ end
 
 -- Killroy Change Methods, these replace ChatLog methods
 
+function Killroy:Change_OnChatMessage()
+
+	local ChatLog = Apollo.GetAddon("ChatLog")
+	if not ChatLog then return nil end
+
+	function ChatLog:OnChatMessage(channelCurrent, tMessage)
+		-- tMessage has bAutoResponse, bGM, bSelf, strSender, strRealmName, nPresenceState, arMessageSegments, unitSource, bShowChatBubble, bCrossFaction, nReportId
+	
+		-- arMessageSegments is an array of tables.  Each table representsa part of the message + the formatting for that segment.
+		-- This allows us to signal font (alien text for example) changes mid stream.
+		-- local example = arMessageSegments[1]
+		-- example.strText is the text
+		-- example.bAlien == true if alien font set
+		-- example.bRolePlay == true if this is rolePlay Text.  RolePlay text should only show up for people in roleplay mode, and non roleplay text should only show up for people outside it.
+	
+		-- to use: 	{#}toggles alien on {*}toggles rp on. Alien is still on {!}resets all format codes.
+	
+	
+		-- There will be a lot of chat messages, particularly for combat log.  If you make your own chat log module, you will want to batch
+		-- up several at a time and only process lines you expect to see.
+	
+		local tQueuedMessage = {}
+		tQueuedMessage.tMessage = tMessage
+		tQueuedMessage.eChannelType = channelCurrent:GetType()
+		tQueuedMessage.strChannelName = channelCurrent:GetName()
+		tQueuedMessage.strChannelCommand = channelCurrent:GetCommand()
+		
+		
+		-- Killroy Range Filter Hooks
+		local Killroy = Apollo.GetAddon("Killroy")
+		if not(Killroy) then return end
+		
+		local bEnableDebug = false
+		
+		-- Only engage the filter with say, emote and animated emotes, and if the message is not the players own
+		
+		local eChannelType = tQueuedMessage.eChannelType
+		local bPlayerTest = true
+		
+		
+		if tMessage.unitSource then
+			bPlayerTest = not (GameLib.GetPlayerUnit():GetName() == tMessage.unitSource:GetName())
+		else
+			bPlayerTest = true
+		end
+		
+		
+		local bChannelTest1 = eChannelType == ChatSystemLib.ChatChannel_Say
+		local bChannelTest2 = eChannelType == ChatSystemLib.ChatChannel_Emote
+		local bChannelTest3 = eChannelType == ChatSystemLib.ChatChannel_AnimatedEmote
+		local bChannelTest = bChannelTest1 or bChannelTest2 or bChannelTest3
+		
+		local bKillMessage = false
+		
+		if eChannelType ~= ChatSystemLib.ChatChannel_Debug and bEnableDebug then Print("bPlayerTest: "..tostring(bPlayerTest).." bChannelTest:"..tostring(bChannelTest)) end
+		if eChannelType ~= ChatSystemLib.ChatChannel_Debug and bEnableDebug then Print("bKillMessage: "..tostring(bKillMessage)) end
+
+		
+		if bPlayerTest and bChannelTest then
+			if Killroy.tPrefs["bRangeFilter"] then
+				for idx, tSegment in ipairs( tMessage.arMessageSegments ) do
+					local strText = tSegment.strText
+					if eChannelType ~= ChatSystemLib.ChatChannel_Debug and bEnableDebug then Print("original strText:"..tostring(strText)) end
+					strText = Killroy:RangeFilter(strText, tMessage.unitSource:GetName(), eChannelType)
+					if eChannelType ~= ChatSystemLib.ChatChannel_Debug and bEnableDebug then Print("post strText:"..tostring(strText)) end
+					if not(strText) then
+						bKillMessage = true
+						if eChannelType ~= ChatSystemLib.ChatChannel_Debug and bEnableDebug then Print("bKillMessage: "..tostring(bKillMessage)) end
+					else
+						if eChannelType ~= ChatSystemLib.ChatChannel_Debug and bEnableDebug then Print("bKillMessage: "..tostring(bKillMessage)) end
+						tSegment.strText = strText
+						if eChannelType ~= ChatSystemLib.ChatChannel_Debug and bEnableDebug then Print("tSegment.strText: "..tostring(tSegment.strText)) end
+					end
+				end
+			end	
+		end	
+						
+		--bKillMessage = false
+		
+		if not bKillMessage then
+			-- handle unit bubble if needed.
+			if tQueuedMessage.tMessage.unitSource and tQueuedMessage.tMessage.bShowChatBubble then
+				self:HelperGenerateChatMessage(tQueuedMessage)
+				if tQueuedMessage.xmlBubble then
+					tMessage.unitSource:AddTextBubble(tQueuedMessage.xmlBubble)
+				end
+			end
+		
+			-- queue message on windows.
+			for key, wndChat in pairs(self.tChatWindows) do
+				if wndChat:GetData().tViewedChannels[tQueuedMessage.eChannelType] then -- check flags for filtering
+					self.bQueuedMessages = true
+					wndChat:GetData().tMessageQueue:Push(tQueuedMessage)
+				end
+			end
+		end
+	end
+
+end
+
 function Killroy:Change_HelperGenerateChatMessage()
 	local aAddon = Apollo.GetAddon("ChatLog")
 	if aAddon == nil then
@@ -477,7 +584,8 @@ function Killroy:Change_HelperGenerateChatMessage()
 
 		local eChannelType = tQueuedMessage.eChannelType
 		local tMessage = tQueuedMessage.tMessage
-
+		
+		--[[
 		-- Killroy Range Filter Hooks
 		local Killroy = Apollo.GetAddon("Killroy")
 		if not(Killroy) then return end
@@ -506,6 +614,7 @@ function Killroy:Change_HelperGenerateChatMessage()
 				end
 			end	
 		end
+		]]--
 		
 		-- Different handling for combat log
 		if eChannelType == ChatSystemLib.ChatChannel_Combat then
