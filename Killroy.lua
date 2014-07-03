@@ -180,14 +180,20 @@ function Killroy:OnDocumentLoaded()
 	--register commands and actions
 	Apollo.RegisterSlashCommand("killroy", "OnKillroyOn", self)
 	Apollo.RegisterEventHandler('OnSetEmoteColor', OnSetEmoteColor, self)
-	Apollo.RegisterEventHandler('OnSetSayColor', OnSetEmoteColor, self)
-	Apollo.RegisterEventHandler('OnSetOOCColor', OnSetEmoteColor, self)
+	Apollo.RegisterEventHandler('OnSetSayColor', OnSetSayColor, self)
+	Apollo.RegisterEventHandler('OnSetOOCColor', OnSetOOCColor, self)
 	
 	-- replace ChatLogFunctions
 	self:Change_HelperGenerateChatMessage()
 	self:Change_OnChatInputReturn()
 	self:Change_OnRoleplayBtn()
 	self:Change_OnChatMessage()
+	self:Change_ActionBarFrame_OnMountBtn()
+	self:RestoreMountSetting()
+	self:Change_AddChannelTypeToList()
+	self:Append_OnChannelColorBtn()
+	self:Change_OnViewCheck()
+	self:Change_VerifyChannelVisibility()
 end
 -----------------------------------------------------------------------------------------------
 -- Killroy Functions
@@ -435,16 +441,19 @@ function Killroy:RangeFilter(sMessage, sSender, eChannelType)
 	if bContext then nRange = nRange / 2 end
 	
 	if self.tPrefs["bUseOcclusion"] then
-		if GameLib.GetPlayerUnitByName(sSender):IsOccluded() then
-			if eChannelType == ChatSystemLib.ChatChannel_Say then
-				nRange = nRange * 2
-			elseif eChannelType == ChatSystemLib.ChatChannel_Emote then
-				return nil
-			elseif eChannelType == ChatSystemLib.ChatChannel_AnimatedEmote then
-				return nil
+		if GameLib.GetPlayerUnitByName(sSender) then
+			if GameLib.GetPlayerUnitByName(sSender):IsOccluded() then
+				if eChannelType == ChatSystemLib.ChatChannel_Say then
+					nRange = nRange * 2
+				elseif eChannelType == ChatSystemLib.ChatChannel_Emote then
+					return nil
+				elseif eChannelType == ChatSystemLib.ChatChannel_AnimatedEmote then
+					return nil
+				end
 			end
 		end
 	end
+	
 	local nMaxRange = 0
 	local nMinRange = 0
 	
@@ -467,9 +476,154 @@ function Killroy:RangeFilter(sMessage, sSender, eChannelType)
 	elseif nMinRange >= nRange then
 		return sMessage
 	end
+end
+
+function Killroy:RestoreMountSetting()
+	if self.tPrefs["nSelectedMount"] then
+		ActionBarFrame = Apollo.GetAddon("ActionBarFrame")
+		if not(ActionBarFrame) then return nil end
+		
+		if self.tPrefs["nSelectedMount"] then
+			ActionBarFrame.nSelectedMount = self.tPrefs["nSelectedMount"]
+			ActionBarFrame:RedrawSelectedMounts()
+		end 
+	end
 end 
 
+--------------------------------------------------------
 -- Killroy Change Methods, these replace ChatLog methods
+--------------------------------------------------------
+function Killroy:Change_OnViewCheck()
+	ChatLog = Apollo.GetAddon("ChatLog")
+	if not ChatLog then return nil end
+	
+	function ChatLog:OnViewCheck(wndHandler, wndControl)
+		Killroy = Apollo.GetAddon("Killroy")
+		if not Killroy then return nil end
+			
+		local bDebug = true
+		
+		local wndChannel = wndControl:GetParent()
+		if bDebug then Print("wndChannel: "..tostring(wndChannel:GetName())) end
+		
+		local wndOptions = wndChannel:GetParent():GetParent():GetParent()
+		if bDebug then Print("wndOptions: "..tostring(wndOptions:GetName())) end
+		
+		local channelType = wndChannel:GetData()
+		if bDebug then Print("channelType: "..tostring(channelType)) end
+		
+		local tData = wndOptions:GetData()
+		if bDebug then Print("tData: "..table.concat(tData)) end
+
+		if tData == nil then
+			return
+		end
+
+		if tData.tViewedChannels[channelType] then
+			tData.tViewedChannels[channelType] = nil
+			self:HelperRemoveChannelFromAll(channelType)
+		else
+			tData.tViewedChannels[channelType] = true
+			self:HelperAddChannelToAll(channelType)
+		end
+	end
+end
+
+function Killroy:Change_VerifyChannelVisibility()
+	ChatLog = Apollo.GetAddon("ChatLog")
+	if not ChatLog then return nil end
+	
+	function ChatLog:VerifyChannelVisibility(channelChecking, tInput, wndChat)
+		Killroy = Apollo.GetAddon("Killroy")
+		if not Killroy then return nil end
+		
+		local tChatData = wndChat:GetData()
+	
+		--if tChatData.tViewedChannels[ channelChecking:GetType() ] ~= nil then
+		if self.tAllViewedChannels[ Killroy:ChannelCludge(channelChecking:GetName(), channelChecking:GetType()) ] ~= nil then -- see if this channelChecking is viewed
+			local strMessage = tInput.strMessage
+			if Killroy:ChannelCludge(channelChecking:GetName(),channelChecking:GetType()) == ChatSystemLib.ChatChannel_AccountWhisper then
+				if self.tAccountWhisperContex then
+					local strCharacterAndRealm = self.tAccountWhisperContex.strCharacterName .. "@" .. self.tAccountWhisperContex.strRealmName
+					strMessage = string.gsub(strMessage, self.tAccountWhisperContex.strDisplayName, strCharacterAndRealm, 1)
+				end
+			end
+			channelChecking:Send(strMessage)
+			return true
+		else
+			local wndInput = wndChat:FindChild("Input")
+	
+			strMessage = String_GetWeaselString(Apollo.GetString("CRB_Message_not_sent_you_are_not_viewing"), channelChecking:GetName())
+			ChatSystemLib.PostOnChannel( ChatSystemLib.ChatChannel_Command, strMessage, "" )
+			wndInput:SetText(String_GetWeaselString(Apollo.GetString("ChatLog_MessageToPlayer"), tInput.strCommand, tInput.strMessage))
+			wndInput:SetFocus()
+			local strSubmitted = wndInput:GetText()
+			wndInput:SetSel(strSubmitted:len(), -1)
+			return false
+		end
+	end
+end
+
+function Killroy:ChannelCludge(sName,nType)
+	local knFudge = 40
+	local nCludge = 0
+	
+	--Print(sName)
+	--Print(sName.."|"..tostring(nType))
+	
+	for idx, this_chan in ipairs(ChatSystemLib.GetChannels()) do
+		--Print(this_chan:GetName())
+	end
+	
+	if nType == ChatSystemLib.ChatChannel_Custom then
+		local chan = ChatSystemLib.GetChannels()
+		for idx, this_chan in ipairs(chan) do
+			--Print("this_chan:"..this_chan:GetName())
+			if this_chan:GetName() == sName then nCludge = idx + knFudge end
+		end
+		return nCludge
+	else
+		return nType
+	end
+end
+
+function Killroy:Change_AddChannelTypeToList()
+	ChatLog = Apollo.GetAddon("ChatLog")
+	if not ChatLog then return nil end
+	
+	function ChatLog:AddChannelTypeToList(tData, wndList, channel)
+		Killroy = Apollo.GetAddon("Killroy")
+		if not Killroy then return nil end
+		--insert a cludge her for channel type 18, so that it gets spread out into multple ids in the chat log
+		
+		local wndChannelItem = Apollo.LoadForm(Killroy.xmlDoc, "ChatType", wndList, self)
+		wndChannelItem:FindChild("TypeName"):SetText(channel:GetName())
+		--wndChannelItem:SetData(channel:GetType())
+		wndChannelItem:SetData(Killroy:ChannelCludge(channel:GetName(), channel:GetType()))
+		--wndChannelItem:FindChild("ViewCheck"):SetCheck(tData.tViewedChannels[channel:GetType()] or false)
+		Print(tostring(channel:GetType()).."|"..tostring(Killroy:ChannelCludge(channel:GetName(),channel:GetType())))
+		wndChannelItem:FindChild("ViewCheck"):SetCheck(tData.tViewedChannels[Killroy:ChannelCludge(channel:GetName(),channel:GetType())] or false)
+		--wndChannelItem:FindChild("HoldCheck"):SetCheck(tData.tHeldChannels[channel:GetType()] or false)
+		wndChannelItem:FindChild("HoldCheck"):SetCheck(tData.tHeldChannels[Killroy:ChannelCludge(channel:GetName(),channel:GetType())] or false)
+	end
+end
+
+function Killroy:Change_ActionBarFrame_OnMountBtn()
+
+	ActionBarFrame = Apollo.GetAddon("ActionBarFrame")
+	if not(ActionBarFrame) then return nil end
+	
+	function ActionBarFrame:OnMountBtn(wndHandler, wndControl)
+		Killroy = Apollo.GetAddon("Killroy")
+		if not(Killroy) then return nil end
+		
+		self.nSelectedMount = wndControl:GetData():GetId()
+		Killroy.tPrefs["nSelectedMount"] = self.nSelectedMount
+	
+		self.wndMountFlyout:FindChild("MountPopoutFrame"):Show(false)
+		self:RedrawSelectedMounts()
+	end
+end
 
 function Killroy:Change_OnChatMessage()
 
@@ -492,16 +646,19 @@ function Killroy:Change_OnChatMessage()
 		-- There will be a lot of chat messages, particularly for combat log.  If you make your own chat log module, you will want to batch
 		-- up several at a time and only process lines you expect to see.
 	
+		local Killroy = Apollo.GetAddon("Killroy")
+		if not(Killroy) then return end
+		
 		local tQueuedMessage = {}
 		tQueuedMessage.tMessage = tMessage
-		tQueuedMessage.eChannelType = channelCurrent:GetType()
+		--Cludge for custom channels
+		--tQueuedMessage.eChannelType = channelCurrent:GetType()
+		tQueuedMessage.eChannelType = Killroy:ChannelCludge(channelCurrent:GetName(),channelCurrent:GetType())
 		tQueuedMessage.strChannelName = channelCurrent:GetName()
 		tQueuedMessage.strChannelCommand = channelCurrent:GetCommand()
 		
 		
 		-- Killroy Range Filter Hooks
-		local Killroy = Apollo.GetAddon("Killroy")
-		if not(Killroy) then return end
 		
 		local bEnableDebug = false
 		
@@ -630,7 +787,8 @@ function Killroy:Change_HelperGenerateChatMessage()
 		local xml = XmlDoc.new()
 		local tm = GameLib.GetLocalTime()
 		local crText = self.arChatColor[eChannelType] or ApolloColor.new("white")
-		local crChannel = ApolloColor.new(karChannelTypeToColor[eChannelType].Channel or "white")
+		--local crChannel = ApolloColor.new(karChannelTypeToColor[eChannelType].Channel or "white")
+		local crChannel = self.arChatColor[eChannelType] or ApolloColor.new("white")
 		local crPlayerName = ApolloColor.new("ChatPlayerName")
 
 		local strTime = "" if self.bShowTimestamp then strTime = string.format("%d:%02d ", tm.nHour, tm.nMinute) end
@@ -901,7 +1059,7 @@ function Killroy:Change_OnChatInputReturn()
 					end
 				else
 					tChatData.channelCurrent = channelCurrent
-					if self.eRoleplayOption == 2 and Killroy.tPrefs['bRPOnly'] then
+					if ((self.eRoleplayOption == 2) or (self.eRoleplayOption == 1)) and Killroy.tPrefs['bRPOnly'] then
 						tInput.strMessage = Apollo.GetString("ChatLog_RPMarker") .. tInput.strMessage
 					end
 					bViewedChannel = self:VerifyChannelVisibility(channelCurrent, tInput, wndForm)
@@ -1015,6 +1173,30 @@ end
 function Killroy:OnRangeSlider( wndHandler, wndControl, fNewValue, fOldValue )
 	sName = wndControl:GetName()
 	self.tRFBuffer[sName] = fNewValue
+end
+
+---------------------------------------------------------------------------------------------------
+-- ChatType Functions
+---------------------------------------------------------------------------------------------------
+
+function Killroy:Append_OnChannelColorBtn()
+	ChatLog = Apollo.GetAddon("ChatLog")
+	if not ChatLog then return nil end
+	Apollo.RegisterEventHandler('OnChannelColorBtn', OnChannelColorBtn, ChatLog)
+
+	function ChatLog:OnChannelColorBtn( wndHandler, wndControl, eMouseButton )
+		Killroy = Apollo.GetAddon("Killroy")
+		if not Killroy then return nil end
+		
+		local GeminiColor = Apollo.GetPackage("GeminiColor").tPackage
+		--Print("OnChannelColorBtn!")
+		GeminiColor:ShowColorPicker( ChatLog, 'OnChannelColorBtnOK', true, "ffffffff")
+	end
+	
+	function ChatLog:OnChannelColorBtnOK(hexcolor)
+		self.arChatColor[3] = ApolloColor.new(hexcolor)
+		Print(tostring(hexcolor))
+	end
 end
 
 -----------------------------------------------------------------------------------------------
