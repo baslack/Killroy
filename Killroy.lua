@@ -114,6 +114,7 @@ function Killroy:new(o)
 			bRPOnly = true,
 			bFormatChat = true,
 			bRangeFilter = true,
+			bCustomChannelColors = true,
 			nSayRange = knDefaultSayRange,
 			nEmoteRange = knDefaultEmoteRange,
 			nFalloff = knDefaultFalloff,
@@ -121,6 +122,7 @@ function Killroy:new(o)
 			kstrEmoteColor = ksDefaultEmoteColor,
 			kstrSayColor = ksDefaultSayColor,
 			kstrOOCColor 	= ksDefaultOOCColor,
+			arChatColor = {},
 		}
 		self.tColorBuffer = 
 		{
@@ -190,15 +192,35 @@ function Killroy:OnDocumentLoaded()
 	self:Change_OnChatMessage()
 	--self:Change_ActionBarFrame_OnMountBtn()
 	--self:RestoreMountSetting()
-	self:Change_AddChannelTypeToList()
-	self:Append_OnChannelColorBtn()
-	self:Change_OnViewCheck()
-	self:Change_VerifyChannelVisibility()
+	if self.tPrefs["bCustomChannelColors"] then
+		self:Change_AddChannelTypeToList()
+		self:Append_OnChannelColorBtn()
+		self:Change_OnViewCheck()
+		self:Change_VerifyChannelVisibility()
+		self:Change_NewChatWindow()
+		self:Change_OnInputChanged()
+		self:Change_OnInputMenuEntry()
+		self:Change_BuildInputTypeMenu()
+		self:Change_HelperRemoveChannelFromInputWindow()
+		self:Change_HelperFindAViewedChannel()
+		self:Change_OnSettings()
+		self.arChatColorTimer = ApolloTimer.Create(2, true, "arChatColor_Check", self)
+	end
 end
 -----------------------------------------------------------------------------------------------
 -- Killroy Functions
 -----------------------------------------------------------------------------------------------
 -- Define general functions here
+
+function Killroy:arChatColor_Check()
+	ChatLog = Apollo.GetAddon("ChatLog")
+	if not ChatLog then return nil end
+	
+	if ChatLog.arChatColor[ChatSystemLib.ChatChannel_AccountWhisper] then
+		self:Restore_arChatColor()
+		self.arChatColorTimer:Stop()
+	end
+end
 
 function Killroy:OnConfigure()
 	self.wndMain:FindChild('bCrossFaction'):SetCheck(not(self.tPrefs['bCrossFaction']))
@@ -488,11 +510,534 @@ function Killroy:RestoreMountSetting()
 			ActionBarFrame:RedrawSelectedMounts()
 		end 
 	end
-end 
+end
+
+function Killroy:Restore_arChatColor()
+	ChatLog = Apollo.GetAddon("ChatLog")
+	if not ChatLog then 
+		return nil 
+	end
+	
+	ChatSystemLib.GetChannels()[2]:Post("Restore Chat Colors")
+	
+	if self.tPrefs["arChatColor"] then
+		for idx, this_channel in ipairs(ChatSystemLib.GetChannels()) do
+			local nCludge = self.ChannelCludge(this_channel:GetName(),this_channel:GetType())
+			if self.tPrefs["arChatColor"][nCludge] then
+				ChatLog.arChatColor[nCludge] = ApolloColor.new(self.tPrefs["arChatColor"][nCludge])
+			end
+		end	
+	end
+	
+end
+
+function Killroy:ChannelCludge(sName,nType)
+	local knFudge = 40
+	local nCludge = 0
+	
+	--Print(sName)
+	--Print(sName.."|"..tostring(nType))
+	
+	for idx, this_chan in ipairs(ChatSystemLib.GetChannels()) do
+		--Print(this_chan:GetName())
+	end
+	
+	if nType == ChatSystemLib.ChatChannel_Custom then
+		local chan = ChatSystemLib.GetChannels()
+		for idx, this_chan in ipairs(chan) do
+			--Print("this_chan:"..this_chan:GetName())
+			if this_chan:GetName() == sName then nCludge = idx + knFudge end
+		end
+		return nCludge
+	else
+		return nType
+	end
+end
+
+function Killroy:Quantize(nFloat)
+	if nFloat < 0 then 
+		return 0
+	elseif nFloat > 1 then 
+		return 255
+	else 
+		return math.ceil(255*nFloat)
+	end
+end
+
+function Killroy:toHex(tColor)
+	local a = self:Quantize(tColor["a"])
+	local r = self:Quantize(tColor["r"])
+	local g = self:Quantize(tColor["g"])
+	local b = self:Quantize(tColor["b"])
+	return string.format("%02x%02x%02x%02x",a,r,g,b)
+end
 
 --------------------------------------------------------
 -- Killroy Change Methods, these replace ChatLog methods
 --------------------------------------------------------
+
+--[[
+
+check color calls in:
+
+NewChatWindow -done
+OnChatInputReturn -done
+OnInputChanged -done
+BuildInputTypeMenu -done
+OnInputMenuEntry -done
+HelperGenerateChatMessage -done
+HelperRemoveChannelFromInputWindow -done
+
+]]--
+
+function Killroy:Change_OnSettings()
+	ChatLog = Apollo.GetAddon("ChatLog")
+	if not ChatLog then return nil end
+
+	function ChatLog:OnSettings(wndHandler, wndControl)
+		Killroy = Apollo.GetAddon("Killroy")
+		if not Killroy then return nil end
+		
+		local wndForm = wndControl:GetParent()
+		local tData = wndForm:GetData()
+	
+		if wndForm:FindChild("BGArt_ChatBackerIcon"):IsShown() then
+			self:OnSettingsCombat(wndForm:FindChild("Options"), wndForm:FindChild("Options"))
+			return
+		end
+	
+		if not wndControl:IsChecked() then
+			tData.wndOptions:Show(false)
+			wndForm:FindChild("Input"):Show(true)
+		else
+			if wndForm:FindChild("EmoteMenu"):IsVisible() then
+				wndForm:FindChild("EmoteMenu"):Show(false)
+				wndForm:FindChild("EmoteBtn"):SetCheck(false)
+			end
+	
+			if wndForm:FindChild("InputWindow"):IsVisible() then
+				wndForm:FindChild("InputWindow"):Show(false)
+				wndForm:FindChild("InputTypeBtn"):SetCheck(false)
+			end
+	
+			self:DrawSettings(wndForm)
+		end
+		
+		for idx, this_channel in ipairs(ChatSystemLib.GetChannels()) do
+			nCludge = Killroy:ChannelCludge(this_channel:GetName(), this_channel:GetType())
+			Killroy.tPrefs["arChatColor"][nCludge] = Killroy:toHex(self.arChatColor[nCludge]:ToTable())
+		end
+			
+	end
+
+end
+
+function Killroy:Change_HelperFindAViewedChannel()
+	ChatLog = Apollo.GetAddon("ChatLog")
+	if not ChatLog then return nil end
+	
+	function ChatLog:HelperFindAViewedChannel()
+		Killroy = Apollo.GetAddon("Killroy")
+		if not Killroy then return nil end
+			
+		local channelNew = nil
+		local nNewChannelIdx = nil
+		local tBaseChannels = ChatSystemLib.GetChannels()
+		local tChannelsWithInput = {}
+	
+		for idx, channelCurrent in pairs(tBaseChannels) do
+			local nCludge = Killroy:ChannelCludge(channelCurrent:GetName(),channelCurrent:GetType())
+			if channelCurrent:GetCommand() ~= nil and channelCurrent:GetCommand() ~= "" then
+				-- tChannelsWithInput[channelCurrent:GetType()] = true
+				tChannelsWithInput[nCludge] = true
+			end
+		end
+	
+		for idx, channelCurrent in pairs(self.tAllViewedChannels) do
+			if self.tAllViewedChannels[idx] ~= nil and tChannelsWithInput[idx] ~= nil then
+				nNewChannelIdx = idx
+				break
+			end
+		end
+	
+		if nNewChannelIdx == nil then
+			nNewChannelIdx = ChatSystemLib.ChatChannel_Say
+		end
+	
+		for idx, channelCurrent in ipairs(tBaseChannels) do
+			local nCludge = Killroy:ChannelCludge(channelCurrent:GetName(),channelCurrent:GetType())
+			--if channelCurrent:GetType() == nNewChannelIdx then
+			if nCludge == nNewChannelIdx then
+				channelNew = channelCurrent
+				break
+			end
+		end
+	
+		return channelNew
+	end
+	
+end
+
+function Killroy:Change_HelperRemoveChannelFromInputWindow()
+	ChatLog = Apollo.GetAddon("ChatLog")
+	if not ChatLog then return nil end
+	
+	function ChatLog:HelperRemoveChannelFromInputWindow(channelRemoved) -- used when we've totally removed a channel
+		Killroy = Apollo.GetAddon("Killroy")
+		if not Killroy then return nil end
+		
+		for idx, wnd in pairs(self.tChatWindows) do
+			local tChatData = wnd:GetData()
+			local nCludge = Killroy:ChannelCludge(tChatData.channelCurrent:GetName(),tChatData.channelCurrent:GetType())
+			--if tChatData.channelCurrent:GetType() == channelRemoved then
+			if nCludge == channelRemoved then
+			
+				local channelNew = self:HelperFindAViewedChannel()
+				local wndInputType = wnd:FindChild("InputType")
+	
+				if channelNew ~= nil then
+					tChatData.channelCurrent = channelNew
+					wndInputType:SetText(tChatData.channelCurrent:GetCommand())
+					--tChatData.crText = self.arChatColor[tChatData.channelCurrent:GetType()]
+					tChatData.crText = self.arChatColor[nCludge]
+
+					wndInputType:SetTextColor(tChatData.crText)
+	
+					--TODO: Helper this since we do it other places
+					local wndInput = wnd:FindChild("Input")
+					local strText = wndInput:GetText()
+					local strCommand = tChatData.channelCurrent:GetAbbreviation()
+	
+					if strCommand == "" or strCommand == nil then
+						strCommand = tChatData.channelCurrent:GetCommand()
+					end
+	
+					if strText == "" then
+						strText =String_GetWeaselString(Apollo.GetString("ChatLog_SlashPrefix"),  strCommand)
+					else
+						local tInput = ChatSystemLib.SplitInput(strText) -- get the existing message, ignore the old command
+						strText = String_GetWeaselString(Apollo.GetString("ChatLog_MessageToPlayer"), strCommand, tInput.strMessage)
+					end
+	
+					wndInput:SetText(strText)
+					--local crText = self.arChatColor[tChatData.channelCurrent:GetType()] or ApolloColor.new("white")
+					local crText = self.arChatColor[nCludge] or ApolloColor.new("white")
+					wndInput:SetTextColor(crText)
+					wndInput:SetFocus()
+					wndInput:SetSel(strText:len(), -1)
+	
+				else
+					wndInputType:SetText("X")
+					wndInputType:SetTextColor(kcrInvalidColor)
+				end
+			end
+		end
+	end
+
+end
+
+function Killroy:Change_OnInputMenuEntry()
+	ChatLog = Apollo.GetAddon("ChatLog")
+	if not ChatLog then return nil end
+	
+	function ChatLog:OnInputMenuEntry(wndHandler, wndControl)
+		Killroy = Apollo.GetAddon("Killroy")
+		if not Killroy then return nil end
+	
+		local channelCurrent = wndControl:GetData()
+		local wndChat = wndControl:GetParent():GetParent():GetParent()
+		local tChatData = wndChat:GetData()
+		local wndInput = wndChat:FindChild("Input")
+		local strText = wndInput:GetText()
+		local strCommand = channelCurrent:GetAbbreviation()
+	
+		if strCommand == "" or strCommand == nil then
+			strCommand = channelCurrent:GetCommand()
+		end
+	
+		if strText == "" then
+			strText = String_GetWeaselString(Apollo.GetString("ChatLog_SlashPrefix"), strCommand)
+		else
+			local tInput = ChatSystemLib.SplitInput(strText) -- get the existing message, ignore the old command
+			strText = String_GetWeaselString(Apollo.GetString("ChatLog_SlashPrefix"), strCommand, tInput.strMessage)
+		end
+	
+		wndInput:SetText(strText)
+		--local crText = self.arChatColor[channelCurrent:GetType()] or ApolloColor.new("white")
+		local crText = self.arChatColor[Killroy:ChannelCludge(channelCurrent:GetName(),channelCurrent:GetType())] or ApolloColor.new("white")
+		local wndInputType = wndChat:FindChild("InputType")
+		wndInput:SetTextColor(crText)
+		wndInputType:SetText(channelCurrent:GetCommand())
+		wndInputType:SetTextColor(crText)
+		wndInputType:Show(string.len(strText) == 0)
+	
+		wndInput:SetFocus()
+		wndInput:SetSel(strText:len(), -1)
+	
+		tChatData.channelCurrent = channelCurrent
+	
+		wndControl:GetParent():GetParent():Show(false)
+		wndChat:FindChild("InputTypeBtn"):SetCheck(false)
+	end
+
+end
+
+function Killroy:Change_BuildInputTypeMenu()
+
+	ChatLog = Apollo.GetAddon("ChatLog")
+	if not ChatLog then return nil end
+	
+	function ChatLog:BuildInputTypeMenu(wndChat) -- setting this up externally so we can remove it from toggle at some point
+		--local wndChannel = wndControl:GetParent()
+		--local wndOptions = wndChat:GetParent():GetParent():GetParent()
+		--local channelType = wndChannel:GetData()
+		Killroy = Apollo.GetAddon("Killroy")
+		if not Killroy then return nil end
+		
+		local tData = wndChat:GetData()
+	
+		if tData == nil then
+			return
+		end
+	
+		local wndInputMenu = wndChat:FindChild("InputWindow")
+		local wndContent = wndInputMenu:FindChild("InputMenuContent")
+		wndContent:DestroyChildren()
+	
+		local tChannels = ChatSystemLib.GetChannels()
+		local nEntryHeight = 26 --height of the entry wnd
+		local nCount = 0 --number of joined channels
+	
+		for idx, channelCurrent in pairs(tChannels) do -- gives us our viewed channels
+			--if tData.tViewedChannels[ channelCurrent:GetType() ] ~= nil then
+			--bs070414, Cludge abbr.
+			local nCludge = Killroy:ChannelCludge(channelCurrent:GetName(),channelCurrent:GetType())
+			--if self.tAllViewedChannels[ channelCurrent:GetType() ] ~= nil then, disabled bs070414
+			if self.tAllViewedChannels[nCludge] ~= nil then
+				if channelCurrent:GetCommand() ~= nil and channelCurrent:GetCommand() ~= "" then -- make sure it's a channelCurrent that can be spoken into
+					local strCommand = channelCurrent:GetAbbreviation()
+	
+					if strCommand == "" or strCommand == nil then
+						strCommand = channelCurrent:GetCommand()
+					end
+	
+					local wndEntry = Apollo.LoadForm(self.xmlDoc, "InputMenuEntry", wndContent, self)
+	
+					local strType = ""
+					if channelCurrent:GetType() == ChatSystemLib.ChatChannel_Custom then
+						strType = Apollo.GetString("ChatLog_CustomLabel")
+					end
+	
+					wndEntry:FindChild("NameText"):SetText(channelCurrent:GetName())
+					wndEntry:FindChild("CommandText"):SetText(String_GetWeaselString(Apollo.GetString("ChatLog_SlashPrefix"), strCommand))
+					wndEntry:SetData(channelCurrent) -- set the channelCurrent
+	
+					--local crText = self.arChatColor[channelCurrent:GetType()] or ApolloColor.new("white")
+					local crText = self.arChatColor[nCludge] or ApolloColor.new("white")
+					Print(channelCurrent:GetName().."|"..Killroy:toHex(crText:ToTable()))
+					wndEntry:FindChild("CommandText"):SetTextColor(crText)
+					wndEntry:FindChild("NameText"):SetTextColor(crText)
+	
+					nCount = nCount + 1
+				end
+			end
+		end
+	
+		if nCount == 0 then
+			local wndEntry = Apollo.LoadForm(self.xmlDoc, "InputMenuEntry", wndContent, self)
+			wndEntry:Enable(false)
+			wndEntry:FindChild("NameText"):SetText(Apollo.GetString("CRB_No_Channels_Visible"))
+			nCount = 1
+		end
+	
+		nEntryHeight = nEntryHeight * nCount
+		wndInputMenu:SetAnchorOffsets(self.nInputMenuLeft, math.max(-knChannelListHeight , self.nInputMenuTop - nEntryHeight), self.nInputMenuRight, self.nInputMenuBottom)
+	
+		wndContent:ArrangeChildrenVert()
+	end
+
+
+end
+
+function Killroy:Change_OnInputChanged()
+	ChatLog = Apollo.GetAddon("ChatLog")
+	if not ChatLog then return nil end
+	
+	function ChatLog:OnInputChanged(wndHandler, wndControl, strText)
+		Killroy = Apollo.GetAddon("Killroy")
+		if not Killroy then return nil end
+		
+		local wndForm = wndControl:GetParent()
+	
+		if wndControl:GetName() ~= "Input" then
+			return
+		end
+	
+		for idx, wndChat in pairs(self.tChatWindows) do
+			wndChat:FindChild("Input"):SetData(false)
+		end
+		wndControl:SetData(true)
+	
+		local wndForm = wndControl:GetParent()
+		local wndInputType = wndForm:FindChild("InputType")
+		local wndInput = wndForm:FindChild("Input")
+		wndInputType:Show(string.len(strText) == 0) -- Hide background say once a message has been typed
+	
+		if strText == Apollo.GetString("ChatLog_Reply") and self.tLastWhisperer and self.tLastWhisperer.strCharacterName ~= "" then
+			local strName = self.tLastWhisperer.strCharacterName
+			local channel = self.channelWhisper
+			if self.tLastWhisperer.eChannelType == ChatSystemLib.ChatChannel_AccountWhisper then
+				channel = self.channelAccountWhisper
+	
+				self.tAccountWhisperContex =
+				{
+					["strDisplayName"]		= self.tLastWhisperer.strDisplayName,
+					["strCharacterName"]	= self.tLastWhisperer.strCharacterName,
+					["strRealmName"]		= self.tLastWhisperer.strRealmName,
+				}
+				strName = self.tLastWhisperer.strDisplayName
+			end
+	
+			local strWhisper = String_GetWeaselString(Apollo.GetString("ChatLog_MessageToPlayer"), channel:GetAbbreviation(), strName)
+	
+			wndInputType:SetText(channel:GetCommand())
+			wndInputType:SetTextColor(self.arChatColor[self.tLastWhisperer.eChannelType])
+			wndInput:SetTextColor(self.arChatColor[self.tLastWhisperer.eChannelType])
+			wndInput:SetText(strWhisper)
+			wndInput:SetFocus()
+			wndInput:SetSel(strWhisper:len(), -1)
+			return
+		end
+	
+		local tChatData = wndForm:GetData()
+		local tInput = ChatSystemLib.SplitInput(strText)
+		local channelInput = tInput.channelCommand or tChatData.channelCurrent
+		-- bs070414, nCludge abbr.
+		local nCludge = Killroy:ChannelCludge(channelInput:GetName(),channelInput:GetType())
+		--local crText = self.arChatColor[channelInput:GetType()] or ApolloColor.new("white")
+		local crText = self.arChatColor[nCludge] or ApolloColor.new("white")
+		wndInputType:SetTextColor(crText)
+		wndInput:SetTextColor(crText)
+	
+		if channelInput:GetType() == ChatSystemLib.ChatChannel_Command then -- command or emote
+			if tInput.bValidCommand then
+				wndInputType:SetText(String_GetWeaselString(Apollo.GetString("CRB_CurlyBrackets"), "", tInput.strCommand))
+				wndInput:SetTextColor(kcrValidColor)
+				wndInputType:SetTextColor(kcrValidColor)
+			else
+				wndInputType:SetText("X")
+				wndInputType:SetTextColor(kcrInvalidColor)
+			end
+		else -- chatting in a channel; check for visibility
+			--if tChatData.tViewedChannels[ channel:GetType() ] ~= nil then -- channel is viewed, Carbine
+			--if self.tAllViewedChannels[ channelInput:GetType() ] ~= nil then -- channel is viewed, bs070414
+			if self.tAllViewedChannels[nCludge] ~= nil then -- channel is viewed
+				wndInputType:SetText(channelInput:GetCommand())
+			else -- channel is hidden
+				wndInputType:SetText(String_GetWeaselString(Apollo.GetString("ChatLog_Invalid"), channelInput:GetCommand()))
+				wndInputType:SetTextColor(kcrInvalidColor)
+			end
+		end
+	end
+
+end	
+
+function Killroy:Change_NewChatWindow()
+	ChatLog = Apollo.GetAddon("ChatLog")
+	if not ChatLog then return nil end
+
+	function ChatLog:NewChatWindow(strTitle, tViewedChannels, tHeldChannels, bCombatLog, channelCurrent)
+		Killroy = Apollo.GetAddon("Killroy")
+		if not Killroy then return nil end	
+	
+		local wndChatWindow = Apollo.LoadForm(self.xmlDoc, "ChatWindow", "FixedHudStratum", self)
+		Event_FireGenericEvent("WindowManagementAdd", {wnd = wndChatWindow, strName = strTitle})
+	
+		wndChatWindow:SetSizingMinimum(240, 240)
+		wndChatWindow:SetStyle("AutoFadeNC", self.bEnableBGFade)
+		wndChatWindow:SetStyle("AutoFadeBG", self.bEnableBGFade)
+		wndChatWindow:FindChild("BGArt"):SetBGColor(CColor.new(1.0, 1.0, 1.0, self.nBGOpacity))
+		wndChatWindow:FindChild("BGArt_SidePanel"):SetBGColor(CColor.new(1.0, 1.0, 1.0, self.nBGOpacity))
+		wndChatWindow:SetText(strTitle)
+		wndChatWindow:Show(true)
+		wndChatWindow:FindChild("MouseCatcher"):SetData({ wndChatWindow:FindChild("InputType"), wndChatWindow:FindChild("InputTypeBtnText") })
+	
+		--Store the initial input window size
+		self.nInputMenuLeft, self.nInputMenuTop, self.nInputMenuRight, self.nInputMenuBottom = wndChatWindow:FindChild("InputWindow"):GetAnchorOffsets()
+	
+		local tChatData = {}
+		tChatData.wndForm = wndChatWindow
+		tChatData.tViewedChannels = {}
+		tChatData.tHeldChannels = {}
+	
+		tChatData.tMessageQueue = Queue:new()
+		tChatData.tChildren = Queue:new()
+	
+		local wndChatChild = wndChatWindow:FindChild("Chat")
+		for idx = 1, self.nMaxChatLines do
+			local wndChatLine = Apollo.LoadForm(self.xmlDoc, "ChatLine", wndChatChild, self)
+			wndChatLine:SetData(idx)
+			wndChatLine:Show(false)
+			tChatData.tChildren:Push(wndChatLine)
+		end
+		tChatData.nNextIndex = self.nMaxChatLines + 1
+	
+		local tChannels = bCombatLog and self.tCombatChannels or tViewedChannels
+		tChatData.wndForm:FindChild("BGArt_ChatBackerIcon"):Show(bCombatLog)
+	
+		for key, value in pairs(tChannels) do
+			tChatData.tViewedChannels[key] = value
+		end
+	
+		for key, value in pairs(tHeldChannels) do
+			tChatData.tHeldChannels[key] = value
+		end
+	
+		tChatData.bCombatLog = bCombatLog
+		wndChatWindow:SetData(tChatData)
+	
+		if not bCombatLog then
+			for key, value in pairs(tViewedChannels) do
+				if value then
+					self:HelperAddChannelToAll(key)
+				end
+			end
+		end
+	
+		tChatData.channelCurrent = channelCurrent or self:HelperFindAViewedChannel()
+	
+		local wndInputType = wndChatWindow:FindChild("InputType")
+		if tChatData.channelCurrent then
+			--tChatData.crText = self.arChatColor[tChatData.channelCurrent:GetType()]
+			tChatData.crText = self.arChatColor[Killroy:ChannelCludge(tChatData.channelCurrent:GetName(), tChatData.channelCurrent:GetType())]
+			wndInputType:SetText(tChatData.channelCurrent:GetCommand())
+			wndInputType:SetTextColor(tChatData.crText)
+		else
+			wndInputType:SetText("X")
+			wndInputType:SetTextColor(kcrInvalidColor)
+		end
+	
+		tChatData.wndOptions = tChatData.wndForm:FindChild("OptionsSubForm")
+		tChatData.wndOptions:Show(false)
+	
+		if #self.tChatWindows >= 1 then
+			wndChatWindow:FindChild("CloseBtn"):Show(true)
+		else
+			wndChatWindow:FindChild("CloseBtn"):Show(false)
+		end
+	
+		table.insert(self.tChatWindows, wndChatWindow)
+	
+		local nWindowCount = #self.tChatWindows
+		if not self.tChatWindows[1]:FindChild("CloseBtn"):IsShown() and nWindowCount > 1 then
+			self.tChatWindows[1]:FindChild("CloseBtn"):Show(true)
+		end
+	
+		return wndChatWindow
+	end
+	
+end
+
 function Killroy:Change_OnViewCheck()
 	ChatLog = Apollo.GetAddon("ChatLog")
 	if not ChatLog then return nil end
@@ -562,47 +1107,6 @@ function Killroy:Change_VerifyChannelVisibility()
 			return false
 		end
 	end
-end
-
-function Killroy:ChannelCludge(sName,nType)
-	local knFudge = 40
-	local nCludge = 0
-	
-	--Print(sName)
-	--Print(sName.."|"..tostring(nType))
-	
-	for idx, this_chan in ipairs(ChatSystemLib.GetChannels()) do
-		--Print(this_chan:GetName())
-	end
-	
-	if nType == ChatSystemLib.ChatChannel_Custom then
-		local chan = ChatSystemLib.GetChannels()
-		for idx, this_chan in ipairs(chan) do
-			--Print("this_chan:"..this_chan:GetName())
-			if this_chan:GetName() == sName then nCludge = idx + knFudge end
-		end
-		return nCludge
-	else
-		return nType
-	end
-end
-
-function Killroy:Quantize(nFloat)
-	if nFloat < 0 then 
-		return 0
-	elseif nFloat > 1 then 
-		return 255
-	else 
-		return math.ceil(255*nFloat)
-	end
-end
-
-function Killroy:toHex(tColor)
-	local a = self:Quantize(tColor["a"])
-	local r = self:Quantize(tColor["r"])
-	local g = self:Quantize(tColor["g"])
-	local b = self:Quantize(tColor["b"])
-	return string.format("%02x%02x%02x%02x",a,r,g,b)
 end
 
 function Killroy:Change_AddChannelTypeToList()
@@ -755,49 +1259,16 @@ function Killroy:Change_OnChatMessage()
 end
 
 function Killroy:Change_HelperGenerateChatMessage()
-	local aAddon = Apollo.GetAddon("ChatLog")
-	if aAddon == nil then
-		return false
-	end
+	ChatLog = Apollo.GetAddon("ChatLog")
+	if not ChatLog then return nil end
 	
-	function aAddon:HelperGenerateChatMessage(tQueuedMessage)
+	function ChatLog:HelperGenerateChatMessage(tQueuedMessage)
 		if tQueuedMessage.xml then
 			return
 		end
 
 		local eChannelType = tQueuedMessage.eChannelType
 		local tMessage = tQueuedMessage.tMessage
-		
-		--[[
-		-- Killroy Range Filter Hooks
-		local Killroy = Apollo.GetAddon("Killroy")
-		if not(Killroy) then return end
-		
-		-- Only engage the filter with say, emote and animated emotes, and if the message is not the players own
-		
-		local bPlayerTest
-		if tMessage.unitSource then
-			bPlayerTest = not (GameLib.GetPlayerUnit():GetName() == tMessage.unitSource:GetName())
-		else
-			bPlayerTest = true
-		end
-		
-		local bChannelTest1 = eChannelType == ChatSystemLib.ChatChannel_Say
-		local bChannelTest2 = eChannelType == ChatSystemLib.ChatChannel_Emote
-		local bChannelTest3 = eChannelType == ChatSystemLib.ChatChannel_AnimatedEmote
-		local bChannelTest = bChannelTest1 or bChannelTest2 or bChannelTest3
-		
-		if bPlayerTest and bChannelTest then
-			if Killroy.tPrefs["bRangeFilter"] then
-				for idx, tSegment in ipairs( tMessage.arMessageSegments ) do
-					local strText = tSegment.strText
-					strText = Killroy:RangeFilter(strText, tMessage.unitSource:GetName(), eChannelType)
-					tSegment.strText = strText
-					if strText == nil then return end
-				end
-			end	
-		end
-		]]--
 		
 		-- Different handling for combat log
 		if eChannelType == ChatSystemLib.ChatChannel_Combat then
@@ -812,6 +1283,7 @@ function Killroy:Change_HelperGenerateChatMessage()
 
 		local xml = XmlDoc.new()
 		local tm = GameLib.GetLocalTime()
+		--local crText = self.arChatColor[eChannelType] or ApolloColor.new("white")
 		local crText = self.arChatColor[eChannelType] or ApolloColor.new("white")
 		--local crChannel = ApolloColor.new(karChannelTypeToColor[eChannelType].Channel or "white")
 		local crChannel = self.arChatColor[eChannelType] or ApolloColor.new("white")
@@ -1092,7 +1564,8 @@ function Killroy:Change_OnChatInputReturn()
 				end
 			end
 
-			local crText = self.arChatColor[tChatData.channelCurrent:GetType()] or ApolloColor.new("white")
+			--local crText = self.arChatColor[tChatData.channelCurrent:GetType()] or ApolloColor.new("white")
+			local crText = self.arChatColor[Killroy:ChannelCludge(tChatData.channelCurrent:GetName(),tChatData.channelCurrent:GetType())] or ApolloColor.new("white")
 			local wndInputType = wndForm:FindChild("InputType")
 			wndForm:GetData().crText = crText
 			wndForm:FindChild("InputType"):SetTextColor(crText)
