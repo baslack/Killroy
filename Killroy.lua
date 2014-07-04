@@ -540,7 +540,8 @@ function Killroy:Restore_arChatColor()
 end
 
 function Killroy:ChannelCludge(sName,nType)
-	local knFudge = 40
+	local knFudgeCustom = 40
+	local knFudgeCircle = 50
 	local nCludge = 0
 	
 	--Print(sName)
@@ -553,8 +554,13 @@ function Killroy:ChannelCludge(sName,nType)
 	if nType == ChatSystemLib.ChatChannel_Custom then
 		local chan = ChatSystemLib.GetChannels()
 		for idx, this_chan in ipairs(chan) do
-			--Print("this_chan:"..this_chan:GetName())
-			if this_chan:GetName() == sName then nCludge = idx + knFudge end
+			if this_chan:GetName() == sName then nCludge = idx + knFudgeCustom end
+		end
+		return nCludge
+	elseif nType == ChatSystemLib.ChatChannel_Society then
+		local chan = ChatSystemLib.GetChannels()
+		for idx, this_chan in ipairs(chan) do
+			if this_chan:GetName() == sName then nCludge = idx + knFudgeCircle end
 		end
 		return nCludge
 	else
