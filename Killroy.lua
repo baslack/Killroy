@@ -188,8 +188,8 @@ function Killroy:OnDocumentLoaded()
 	self:Change_OnChatInputReturn()
 	self:Change_OnRoleplayBtn()
 	self:Change_OnChatMessage()
-	self:Change_ActionBarFrame_OnMountBtn()
-	self:RestoreMountSetting()
+	--self:Change_ActionBarFrame_OnMountBtn()
+	--self:RestoreMountSetting()
 	self:Change_AddChannelTypeToList()
 	self:Append_OnChannelColorBtn()
 	self:Change_OnViewCheck()
@@ -587,6 +587,24 @@ function Killroy:ChannelCludge(sName,nType)
 	end
 end
 
+function Killroy:Quantize(nFloat)
+	if nFloat < 0 then 
+		return 0
+	elseif nFloat > 1 then 
+		return 255
+	else 
+		return math.ceil(255*nFloat)
+	end
+end
+
+function Killroy:toHex(tColor)
+	local a = self:Quantize(tColor["a"])
+	local r = self:Quantize(tColor["r"])
+	local g = self:Quantize(tColor["g"])
+	local b = self:Quantize(tColor["b"])
+	return string.format("%02x%02x%02x%02x",a,r,g,b)
+end
+
 function Killroy:Change_AddChannelTypeToList()
 	ChatLog = Apollo.GetAddon("ChatLog")
 	if not ChatLog then return nil end
@@ -596,15 +614,23 @@ function Killroy:Change_AddChannelTypeToList()
 		if not Killroy then return nil end
 		--insert a cludge her for channel type 18, so that it gets spread out into multple ids in the chat log
 		
+		local nCludge = Killroy:ChannelCludge(channel:GetName(), channel:GetType())
 		local wndChannelItem = Apollo.LoadForm(Killroy.xmlDoc, "ChatType", wndList, self)
 		wndChannelItem:FindChild("TypeName"):SetText(channel:GetName())
 		--wndChannelItem:SetData(channel:GetType())
-		wndChannelItem:SetData(Killroy:ChannelCludge(channel:GetName(), channel:GetType()))
+		wndChannelItem:SetData(nCludge)
 		--wndChannelItem:FindChild("ViewCheck"):SetCheck(tData.tViewedChannels[channel:GetType()] or false)
-		Print(tostring(channel:GetType()).."|"..tostring(Killroy:ChannelCludge(channel:GetName(),channel:GetType())))
-		wndChannelItem:FindChild("ViewCheck"):SetCheck(tData.tViewedChannels[Killroy:ChannelCludge(channel:GetName(),channel:GetType())] or false)
+		wndChannelItem:FindChild("ViewCheck"):SetCheck(tData.tViewedChannels[nCludge] or false)
 		--wndChannelItem:FindChild("HoldCheck"):SetCheck(tData.tHeldChannels[channel:GetType()] or false)
-		wndChannelItem:FindChild("HoldCheck"):SetCheck(tData.tHeldChannels[Killroy:ChannelCludge(channel:GetName(),channel:GetType())] or false)
+		wndChannelItem:FindChild("HoldCheck"):SetCheck(tData.tHeldChannels[nCludge] or false)
+		
+		local CCB = wndChannelItem:FindChild("ChannelColorBtn")
+		if self.arChatColor[nCludge] then
+			CCB:SetBGColor(self.arChatColor[nCludge])
+		else
+			CCB:SetBGColor(self.arChatColor[ChatSystemLib.ChatChannel_Custom])
+			self.arChatColor[nCludge] = self.arChatColor[ChatSystemLib.ChatChannel_Custom]
+		end
 	end
 end
 
