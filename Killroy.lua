@@ -122,7 +122,6 @@ function Killroy:new(o)
 			kstrEmoteColor = ksDefaultEmoteColor,
 			kstrSayColor = ksDefaultSayColor,
 			kstrOOCColor 	= ksDefaultOOCColor,
-			arChatColor = {},
 		}
 		self.tColorBuffer = 
 		{
@@ -135,6 +134,7 @@ function Killroy:new(o)
 			nEmoteRange = knDefaultEmoteRange,
 			nFalloff = knDefaultFalloff,
 		}
+		self.arChatColor = {}
 	else
 		self.tColorBuffer = 
 		{
@@ -249,8 +249,13 @@ function Killroy:GetPreferences()
 end
 
 function Killroy:OnSave(eLevel)
-	if (eLevel ~= GameLib.CodeEnumAddonSaveLevel.Account) then return nil end
-	return {tPrefs = self.tPrefs,}
+	if (eLevel == GameLib.CodeEnumAddonSaveLevel.Account) then
+		return {tPrefs = self.tPrefs,}
+	elseif (eLevel == GameLib.CodeEnumAddonSaveLevel.Character) then
+		return {arChatColor = self.arChatColor}
+	else
+		return nil
+	end
 end
 
 function Killroy:OnRestore(eLevel, tData)
@@ -258,6 +263,11 @@ function Killroy:OnRestore(eLevel, tData)
 	if (tData.tPrefs ~= nil) then
 		for i,v in pairs(tData.tPrefs) do
 			self.tPrefs[i] = v
+		end
+	end
+	if (tData.arChatColor ~= nil) then
+		for i,v in pairs(tData.arChatColor) do
+			self.arChatColor[i] = v
 		end
 	end
 end
@@ -518,13 +528,11 @@ function Killroy:Restore_arChatColor()
 		return nil 
 	end
 	
-	ChatSystemLib.GetChannels()[2]:Post("Restore Chat Colors")
-	
-	if self.tPrefs["arChatColor"] then
+	if next(self.arChatColor) ~= nil then
 		for idx, this_channel in ipairs(ChatSystemLib.GetChannels()) do
-			local nCludge = self.ChannelCludge(this_channel:GetName(),this_channel:GetType())
-			if self.tPrefs["arChatColor"][nCludge] then
-				ChatLog.arChatColor[nCludge] = ApolloColor.new(self.tPrefs["arChatColor"][nCludge])
+			local nCludge = self:ChannelCludge(this_channel:GetName(),this_channel:GetType())
+			if self.arChatColor[nCludge] then
+				ChatLog.arChatColor[nCludge] = ApolloColor.new(self.arChatColor[nCludge])
 			end
 		end	
 	end
@@ -625,7 +633,7 @@ function Killroy:Change_OnSettings()
 		
 		for idx, this_channel in ipairs(ChatSystemLib.GetChannels()) do
 			nCludge = Killroy:ChannelCludge(this_channel:GetName(), this_channel:GetType())
-			Killroy.tPrefs["arChatColor"][nCludge] = Killroy:toHex(self.arChatColor[nCludge]:ToTable())
+			Killroy.arChatColor[nCludge] = Killroy:toHex(self.arChatColor[nCludge]:ToTable())
 		end
 			
 	end
@@ -834,7 +842,6 @@ function Killroy:Change_BuildInputTypeMenu()
 	
 					--local crText = self.arChatColor[channelCurrent:GetType()] or ApolloColor.new("white")
 					local crText = self.arChatColor[nCludge] or ApolloColor.new("white")
-					Print(channelCurrent:GetName().."|"..Killroy:toHex(crText:ToTable()))
 					wndEntry:FindChild("CommandText"):SetTextColor(crText)
 					wndEntry:FindChild("NameText"):SetTextColor(crText)
 	
@@ -1046,7 +1053,7 @@ function Killroy:Change_OnViewCheck()
 		Killroy = Apollo.GetAddon("Killroy")
 		if not Killroy then return nil end
 			
-		local bDebug = true
+		local bDebug = false
 		
 		local wndChannel = wndControl:GetParent()
 		if bDebug then Print("wndChannel: "..tostring(wndChannel:GetName())) end
