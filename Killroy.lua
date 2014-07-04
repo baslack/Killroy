@@ -1213,15 +1213,18 @@ function Killroy:Append_OnChannelColorBtn()
 	function ChatLog:OnChannelColorBtn( wndHandler, wndControl, eMouseButton )
 		Killroy = Apollo.GetAddon("Killroy")
 		if not Killroy then return nil end
-		
+
 		local GeminiColor = Apollo.GetPackage("GeminiColor").tPackage
-		--Print("OnChannelColorBtn!")
-		GeminiColor:ShowColorPicker( ChatLog, 'OnChannelColorBtnOK', true, "ffffffff")
+		
+		wndChatType = wndControl:GetParent()
+		nChannel = wndChatType:GetData()
+		
+		GeminiColor:ShowColorPicker( ChatLog, 'OnChannelColorBtnOK', true, Killroy:toHex(self.arChatColor[nChannel]), nChannel, wndControl)
 	end
 	
-	function ChatLog:OnChannelColorBtnOK(hexcolor)
-		self.arChatColor[3] = ApolloColor.new(hexcolor)
-		Print(tostring(hexcolor))
+	function ChatLog:OnChannelColorBtnOK(hexcolor, nChannel, wndControl)
+		self.arChatColor[nChannel] = ApolloColor.new(hexcolor)
+		wndControl:SetBGColor(self.arChatColor[nChannel])
 	end
 end
 
