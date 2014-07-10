@@ -195,13 +195,14 @@ function Killroy:OnDocumentLoaded()
 	self:Change_OnChatInputReturn()
 	self:Change_OnRoleplayBtn()
 	self:Change_OnChatMessage()
+	self:Change_VerifyChannelVisibility()
+
 	--self:Change_ActionBarFrame_OnMountBtn()
 	--self:RestoreMountSetting()
 	if self.tPrefs["bCustomChatColors"] then
 		self:Change_AddChannelTypeToList()
 		self:Append_OnChannelColorBtn()
 		self:Change_OnViewCheck()
-		self:Change_VerifyChannelVisibility()
 		self:Change_NewChatWindow()
 		self:Change_OnInputChanged()
 		self:Change_OnInputMenuEntry()
@@ -1160,15 +1161,45 @@ function Killroy:Change_VerifyChannelVisibility()
 		local tChatData = wndChat:GetData()
 	
 		--if tChatData.tViewedChannels[ channelChecking:GetType() ] ~= nil then
-		if self.tAllViewedChannels[ Killroy:ChannelCludge(channelChecking:GetName(), channelChecking:GetType()) ] ~= nil then -- see if this channelChecking is viewed
+		--use cludge if custom colors enabled
+		local nTestChannelType
+		if Killroy.tPrefs["bCustomChatColors"] then
+			nTestChannelType = self.tAllViewedChannels[ Killroy:ChannelCludge(channelChecking:GetName(), channelChecking:GetType()) ]
+		else
+			nTestChannelType = tChatData.tViewedChannels[ channelChecking:GetType() ]
+		end
+		
+		if nTestChannelType ~= nil then -- see if this channelChecking is viewed
 			local strMessage = tInput.strMessage
-			if Killroy:ChannelCludge(channelChecking:GetName(),channelChecking:GetType()) == ChatSystemLib.ChatChannel_AccountWhisper then
+			
+			--as previous, use cludge if
+			local nCheckingType
+			if Killroy.tPrefs["bCustomChatColors"] then
+				nCheckingType = Killroy:ChannelCludge(channelChecking:GetName(),channelChecking:GetType())
+			else
+				nCheckingType = channelChecking:GetType()
+			end
+			
+			if nCheckingType == ChatSystemLib.ChatChannel_AccountWhisper then
 				if self.tAccountWhisperContex then
 					local strCharacterAndRealm = self.tAccountWhisperContex.strCharacterName .. "@" .. self.tAccountWhisperContex.strRealmName
 					strMessage = string.gsub(strMessage, self.tAccountWhisperContex.strDisplayName, strCharacterAndRealm, 1)
 				end
 			end
+			
+			-- filter for targets and embedded emotes before sending to channel
+			local strTargetFiltered = Killroy:ParseForTarget(strMessage)
+			local tEmoteFiltered = Killroy:ParseForAnimatedEmote(strTargetFiltered)
+			strMessage = tEmoteFiltered["strTextClean"]
+			local strEmbeddedEmote = tEmoteFiltered["strEmbeddedEmote"]
+			
 			channelChecking:Send(strMessage)
+			
+			if strEmbeddedEmote then
+				local ComChan = Killroy:GetChannelByName("Command")
+				ComChan:Send(strEmbeddedEmote)
+			end
+			
 			return true
 		else
 			local wndInput = wndChat:FindChild("Input")
@@ -1257,6 +1288,7 @@ function Killroy:Change_OnChatMessage()
 		local tQueuedMessage = {}
 		tQueuedMessage.tMessage = tMessage
 		
+		--[[
 		--%t target substitution
 		for idx, this_segment in ipairs(tQueuedMessage.tMessage.arMessageSegments) do
 			local strText = this_segment.strText
@@ -1277,6 +1309,7 @@ function Killroy:Change_OnChatMessage()
 			strText = this_dump["strTextClean"]
 			this_segment.strText = strText
 		end
+		]]--
 		
 		--Cludge for custom channels
 		--tQueuedMessage.eChannelType = channelCurrent:GetType()
@@ -1362,10 +1395,12 @@ function Killroy:Change_OnChatMessage()
 			end
 		end
 		
+		--[[
 		if strEmbeddedEmote and (tQueuedMessage.tMessage.strSender == GameLib.GetPlayerUnit():GetName()) then
 			ComChan = Killroy:GetChannelByName("Command")
 			ComChan:Send(strEmbeddedEmote)
 		end
+		]]--
 	end
 
 end
