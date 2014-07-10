@@ -122,7 +122,7 @@ function Killroy:new(o)
 			kstrEmoteColor = ksDefaultEmoteColor,
 			kstrSayColor = ksDefaultSayColor,
 			kstrOOCColor 	= ksDefaultOOCColor,
-			sVersion = "1-3-6"
+			sVersion = "1-3-7"
 		}
 		self.tColorBuffer = 
 		{
@@ -150,6 +150,9 @@ function Killroy:new(o)
 			nFalloff = self.tPrefs['nFalloff'],
 		}
 	end
+	
+	self.bReloadUIRequired = false
+	self.bSkipAnimatedEmote = false
 
     return o
 end
@@ -290,6 +293,47 @@ end
 function Killroy:KillroyAbout()
 	local SystemChannel = self:GetChannelByName("System")
 	SystemChannel:Post(string.format("Killroy Version: %s", self.tPrefs["sVersion"]))
+end
+
+function Killroy:ParseForAnimatedEmote(strText)
+	local strTextClean
+	local strEmbeddedEmote
+	
+	--capture the emote
+	local strEmbeddedEmote = string.match(strText, "[{](.*)[}]")
+	local bValidEmote = false
+	
+	--check for valid emote
+	for idx, this_emote in ipairs(ChatSystemLib.GetEmotes()) do
+		if this_emote == strEmbeddedEmote then bValidEmote = true end
+	end
+	
+	--cleanup
+	if bValidEmote then
+		strTextClean = string.gsub (strText, "%s*%b{}", "")
+	else
+		strTextClean = strText
+	end
+	
+	--dump a table to return
+	local tDump = {}
+	tDump["strTextClean"] = strTextClean
+	if bValidEmote then
+		tDump["strEmbeddedEmote"] = "/"..strEmbeddedEmote
+		self.bSkipAnimatedEmote = true
+	else
+		tDump["strEmbeddedEmote"] = nil
+	end
+	
+	return tDump
+end
+
+function Killroy:ParseForTarget(strText)
+	if GameLib.GetTargetUnit() ~=  nil then
+		return string.gsub (strText, "%%t", GameLib.GetTargetUnit():GetName())
+	else
+		return strText
+	end
 end
 
 function Killroy:ParseForContext(strText, eChannelType)
@@ -1212,6 +1256,28 @@ function Killroy:Change_OnChatMessage()
 		
 		local tQueuedMessage = {}
 		tQueuedMessage.tMessage = tMessage
+		
+		--%t target substitution
+		for idx, this_segment in ipairs(tQueuedMessage.tMessage.arMessageSegments) do
+			local strText = this_segment.strText
+			strText = Killroy:ParseForTarget(strText)
+			this_segment.strText = strText
+		end
+		
+		--Animated Emote Parsing
+		local strEmbeddedEmote = nil
+		local bFirst = true
+		for idx, this_segment in ipairs(tQueuedMessage.tMessage.arMessageSegments) do
+			local strText = this_segment.strText
+			local this_dump = Killroy:ParseForAnimatedEmote(strText)
+			if this_dump["strEmbeddedEmote"] and bFirst then
+				bFirst = not bFirst
+				strEmbeddedEmote = this_dump["strEmbeddedEmote"]
+			end
+			strText = this_dump["strTextClean"]
+			this_segment.strText = strText
+		end
+		
 		--Cludge for custom channels
 		--tQueuedMessage.eChannelType = channelCurrent:GetType()
 		if Killroy.tPrefs["bCustomChatColors"] then
@@ -1246,6 +1312,12 @@ function Killroy:Change_OnChatMessage()
 		local bChannelTest = bChannelTest1 or bChannelTest2 or bChannelTest3
 		
 		local bKillMessage = false
+		
+		--skip animated emote test
+		if eChannelType == ChatSystemLib.ChatChannel_AnimatedEmote and Killroy.bSkipAnimatedEmote then
+			Killroy.bSkipAnimatedEmote = false
+			bKillMessage = true
+		end
 		
 		if eChannelType ~= ChatSystemLib.ChatChannel_Debug and bEnableDebug then Print("bPlayerTest: "..tostring(bPlayerTest).." bChannelTest:"..tostring(bChannelTest)) end
 		if eChannelType ~= ChatSystemLib.ChatChannel_Debug and bEnableDebug then Print("bKillMessage: "..tostring(bKillMessage)) end
@@ -1288,6 +1360,11 @@ function Killroy:Change_OnChatMessage()
 					wndChat:GetData().tMessageQueue:Push(tQueuedMessage)
 				end
 			end
+		end
+		
+		if strEmbeddedEmote and (tQueuedMessage.tMessage.strSender == GameLib.GetPlayerUnit():GetName()) then
+			ComChan = Killroy:GetChannelByName("Command")
+			ComChan:Send(strEmbeddedEmote)
 		end
 	end
 
@@ -1605,10 +1682,11 @@ function Killroy:Change_OnChatInputReturn()
 			end
 
 			--local crText = self.arChatColor[tChatData.channelCurrent:GetType()] or ApolloColor.new("white")
+			local crtext
 			if Killroy.tPrefs["bCustomChatColors"] then
-				local crText = self.arChatColor[Killroy:ChannelCludge(tChatData.channelCurrent:GetName(),tChatData.channelCurrent:GetType())] or ApolloColor.new("white")
+				crText = self.arChatColor[Killroy:ChannelCludge(tChatData.channelCurrent:GetName(),tChatData.channelCurrent:GetType())] or ApolloColor.new("white")
 			else
-				local crText = self.arChatColor[tChatData.channelCurrent:GetType()] or ApolloColor.new("white")
+				crText = self.arChatColor[tChatData.channelCurrent:GetType()] or ApolloColor.new("white")
 			end
 			local wndInputType = wndForm:FindChild("InputType")
 			wndForm:GetData().crText = crText
@@ -1668,6 +1746,11 @@ function Killroy:OnOK()
 	self.tPrefs['nSayRange'] = self.tRFBuffer['nSayRange']
 	self.tPrefs['nEmoteRange'] = self.tRFBuffer['nEmoteRange']
 	self.tPrefs['nFalloff'] = self.tRFBuffer['nFalloff']
+	if self.bReloadUIRequired then
+		self.bReloadUIRequired = false
+		local ComChan = self:GetChannelByName("Command")
+		ComChan:Send("/reloadui")
+	end
 end
 
 -- when the Cancel button is clicked
@@ -1685,6 +1768,7 @@ function Killroy:OnCancel()
 	self.tRFBuffer['nSayRange'] = self.tPrefs['nSayRange']
 	self.tRFBuffer['nEmoteRange'] = self.tPrefs['nEmoteRange']
 	self.tRFBuffer['nFalloff'] = self.tPrefs['nFalloff']
+	self.bReloadUIRequired = false
 end
 
 function Killroy:OnSetOOCColor( wndHandler, wndControl, eMouseButton )
@@ -1723,8 +1807,7 @@ function Killroy:OnRangeSlider( wndHandler, wndControl, fNewValue, fOldValue )
 end
 
 function Killroy:OnCustomChatColorsChanged( wndHandler, wndControl, eMouseButton )
-	SystemChannel = self:GetChannelByName("System")
-	SystemChannel:Post("You have changed the Custom Chat Colors setting. A reload of the ui is required.")
+	self.bReloadUIRequired = true
 end
 
 ---------------------------------------------------------------------------------------------------
