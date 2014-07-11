@@ -122,7 +122,7 @@ function Killroy:new(o)
 			kstrEmoteColor = ksDefaultEmoteColor,
 			kstrSayColor = ksDefaultSayColor,
 			kstrOOCColor 	= ksDefaultOOCColor,
-			sVersion = "1-3-7"
+			sVersion = "1-3-8"
 		}
 		self.tColorBuffer = 
 		{
@@ -151,7 +151,9 @@ function Killroy:new(o)
 		}
 	end
 	
+	-- global state for color chat disable reset of ui
 	self.bReloadUIRequired = false
+	-- global state for skipping the next animated emote
 	self.bSkipAnimatedEmote = false
 
     return o
@@ -222,7 +224,7 @@ function Killroy:arChatColor_Check()
 	ChatLog = Apollo.GetAddon("ChatLog")
 	if not ChatLog then return nil end
 	
-	if ChatLog.arChatColor[ChatSystemLib.ChatChannel_AccountWhisper] then
+	if ChatLog.arChatColor then
 		self:Restore_arChatColor()
 		self.arChatColorTimer:Stop()
 	end
@@ -321,6 +323,7 @@ function Killroy:ParseForAnimatedEmote(strText)
 	tDump["strTextClean"] = strTextClean
 	if bValidEmote then
 		tDump["strEmbeddedEmote"] = "/"..strEmbeddedEmote
+		-- this global state is for determining if the next animated emote message needs to be skipped
 		self.bSkipAnimatedEmote = true
 	else
 		tDump["strEmbeddedEmote"] = nil
@@ -607,13 +610,6 @@ function Killroy:ChannelCludge(sName,nType)
 	local knFudgeCircle = 50
 	local nCludge = 0
 	
-	--Print(sName)
-	--Print(sName.."|"..tostring(nType))
-	
-	for idx, this_chan in ipairs(ChatSystemLib.GetChannels()) do
-		--Print(this_chan:GetName())
-	end
-	
 	if nType == ChatSystemLib.ChatChannel_Custom then
 		local chan = ChatSystemLib.GetChannels()
 		for idx, this_chan in ipairs(chan) do
@@ -652,20 +648,6 @@ end
 --------------------------------------------------------
 -- Killroy Change Methods, these replace ChatLog methods
 --------------------------------------------------------
-
---[[
-
-check color calls in:
-
-NewChatWindow -done
-OnChatInputReturn -done
-OnInputChanged -done
-BuildInputTypeMenu -done
-OnInputMenuEntry -done
-HelperGenerateChatMessage -done
-HelperRemoveChannelFromInputWindow -done
-
-]]--
 
 function Killroy:Change_OnSettings()
 	ChatLog = Apollo.GetAddon("ChatLog")
@@ -1121,20 +1103,14 @@ function Killroy:Change_OnViewCheck()
 	function ChatLog:OnViewCheck(wndHandler, wndControl)
 		Killroy = Apollo.GetAddon("Killroy")
 		if not Killroy then return nil end
-			
-		local bDebug = false
-		
+	
 		local wndChannel = wndControl:GetParent()
-		if bDebug then Print("wndChannel: "..tostring(wndChannel:GetName())) end
 		
 		local wndOptions = wndChannel:GetParent():GetParent():GetParent()
-		if bDebug then Print("wndOptions: "..tostring(wndOptions:GetName())) end
 		
 		local channelType = wndChannel:GetData()
-		if bDebug then Print("channelType: "..tostring(channelType)) end
 		
 		local tData = wndOptions:GetData()
-		if bDebug then Print("tData: "..table.concat(tData)) end
 
 		if tData == nil then
 			return
@@ -1190,7 +1166,9 @@ function Killroy:Change_VerifyChannelVisibility()
 			-- filter for targets and embedded emotes before sending to channel
 			local strTargetFiltered = Killroy:ParseForTarget(strMessage)
 			local tEmoteFiltered = Killroy:ParseForAnimatedEmote(strTargetFiltered)
-			strMessage = tEmoteFiltered["strTextClean"]
+			-- disabled so that {} gets sent to be filtered on receiving
+			--strMessage = tEmoteFiltered["strTextClean"]
+			strMessage = strTargetFiltered
 			local strEmbeddedEmote = tEmoteFiltered["strEmbeddedEmote"]
 			
 			channelChecking:Send(strMessage)
@@ -1288,28 +1266,6 @@ function Killroy:Change_OnChatMessage()
 		local tQueuedMessage = {}
 		tQueuedMessage.tMessage = tMessage
 		
-		--[[
-		--%t target substitution
-		for idx, this_segment in ipairs(tQueuedMessage.tMessage.arMessageSegments) do
-			local strText = this_segment.strText
-			strText = Killroy:ParseForTarget(strText)
-			this_segment.strText = strText
-		end
-		
-		--Animated Emote Parsing
-		local strEmbeddedEmote = nil
-		local bFirst = true
-		for idx, this_segment in ipairs(tQueuedMessage.tMessage.arMessageSegments) do
-			local strText = this_segment.strText
-			local this_dump = Killroy:ParseForAnimatedEmote(strText)
-			if this_dump["strEmbeddedEmote"] and bFirst then
-				bFirst = not bFirst
-				strEmbeddedEmote = this_dump["strEmbeddedEmote"]
-			end
-			strText = this_dump["strTextClean"]
-			this_segment.strText = strText
-		end
-		]]--
 		
 		--Cludge for custom channels
 		--tQueuedMessage.eChannelType = channelCurrent:GetType()
@@ -1324,16 +1280,14 @@ function Killroy:Change_OnChatMessage()
 		
 		-- Killroy Range Filter Hooks
 		
-		local bEnableDebug = false
-		
 		-- Only engage the filter with say, emote and animated emotes, and if the message is not the players own
 		
 		local eChannelType = tQueuedMessage.eChannelType
 		local bPlayerTest = true
 		
 		
-		if tMessage.unitSource then
-			bPlayerTest = not (GameLib.GetPlayerUnit():GetName() == tMessage.unitSource:GetName())
+		if tQueuedMessage.tMessage.unitSource then
+			bPlayerTest = not (GameLib.GetPlayerUnit():GetName() == tQueuedMessage.tMessage.unitSource:GetName())
 		else
 			bPlayerTest = true
 		end
@@ -1346,37 +1300,32 @@ function Killroy:Change_OnChatMessage()
 		
 		local bKillMessage = false
 		
+		--filter to remove {} from stream
+		for idx, this_segment in ipairs(tQueuedMessage.tMessage.arMessageSegments) do
+			local tFiltered = Killroy:ParseForAnimatedEmote(this_segment.strText)
+			this_segment.strText = tFiltered["strTextClean"]
+		end
+		
 		--skip animated emote test
 		if eChannelType == ChatSystemLib.ChatChannel_AnimatedEmote and Killroy.bSkipAnimatedEmote then
 			Killroy.bSkipAnimatedEmote = false
 			bKillMessage = true
 		end
 		
-		if eChannelType ~= ChatSystemLib.ChatChannel_Debug and bEnableDebug then Print("bPlayerTest: "..tostring(bPlayerTest).." bChannelTest:"..tostring(bChannelTest)) end
-		if eChannelType ~= ChatSystemLib.ChatChannel_Debug and bEnableDebug then Print("bKillMessage: "..tostring(bKillMessage)) end
-
-		
 		if bPlayerTest and bChannelTest then
 			if Killroy.tPrefs["bRangeFilter"] then
-				for idx, tSegment in ipairs( tMessage.arMessageSegments ) do
+				for idx, tSegment in ipairs( tQueuedMessage.tMessage.arMessageSegments ) do
 					local strText = tSegment.strText
-					if eChannelType ~= ChatSystemLib.ChatChannel_Debug and bEnableDebug then Print("original strText:"..tostring(strText)) end
-					strText = Killroy:RangeFilter(strText, tMessage.unitSource:GetName(), eChannelType)
-					if eChannelType ~= ChatSystemLib.ChatChannel_Debug and bEnableDebug then Print("post strText:"..tostring(strText)) end
+					strText = Killroy:RangeFilter(strText, tQueuedMessage.tMessage.unitSource:GetName(), eChannelType)
 					if not(strText) then
 						bKillMessage = true
-						if eChannelType ~= ChatSystemLib.ChatChannel_Debug and bEnableDebug then Print("bKillMessage: "..tostring(bKillMessage)) end
 					else
-						if eChannelType ~= ChatSystemLib.ChatChannel_Debug and bEnableDebug then Print("bKillMessage: "..tostring(bKillMessage)) end
 						tSegment.strText = strText
-						if eChannelType ~= ChatSystemLib.ChatChannel_Debug and bEnableDebug then Print("tSegment.strText: "..tostring(tSegment.strText)) end
 					end
 				end
 			end	
 		end	
 						
-		--bKillMessage = false
-		
 		if not bKillMessage then
 			-- handle unit bubble if needed.
 			if tQueuedMessage.tMessage.unitSource and tQueuedMessage.tMessage.bShowChatBubble then
@@ -1395,12 +1344,6 @@ function Killroy:Change_OnChatMessage()
 			end
 		end
 		
-		--[[
-		if strEmbeddedEmote and (tQueuedMessage.tMessage.strSender == GameLib.GetPlayerUnit():GetName()) then
-			ComChan = Killroy:GetChannelByName("Command")
-			ComChan:Send(strEmbeddedEmote)
-		end
-		]]--
 	end
 
 end
