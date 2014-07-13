@@ -122,7 +122,7 @@ function Killroy:new(o)
 			kstrEmoteColor = ksDefaultEmoteColor,
 			kstrSayColor = ksDefaultSayColor,
 			kstrOOCColor 	= ksDefaultOOCColor,
-			sVersion = "1-3-8"
+			sVersion = "1-3-9"
 		}
 		self.tColorBuffer = 
 		{
@@ -544,9 +544,11 @@ function Killroy:RangeFilter(sMessage, sSender, eChannelType)
 				if eChannelType == ChatSystemLib.ChatChannel_Say then
 					nRange = nRange * 2
 				elseif eChannelType == ChatSystemLib.ChatChannel_Emote then
-					return nil
+					--return nil, disabled to prevent strange occlusion bugs
+					nRange = nRange * 2
 				elseif eChannelType == ChatSystemLib.ChatChannel_AnimatedEmote then
-					return nil
+					--return nil, as above
+					nRange = nRange * 2
 				end
 			end
 		end
@@ -1165,12 +1167,16 @@ function Killroy:Change_VerifyChannelVisibility()
 			
 			-- filter for targets and embedded emotes before sending to channel
 			local strTargetFiltered = Killroy:ParseForTarget(strMessage)
-			local tEmoteFiltered = Killroy:ParseForAnimatedEmote(strTargetFiltered)
-			-- disabled so that {} gets sent to be filtered on receiving
-			--strMessage = tEmoteFiltered["strTextClean"]
-			strMessage = strTargetFiltered
-			local strEmbeddedEmote = tEmoteFiltered["strEmbeddedEmote"]
 			
+			-- adding a check for inline emotes to say and emote only
+			local bEmoteOrSay = (nCheckingType == ChatSystemLib.ChatChannel_Emote) or (nCheckingType == ChatSystemLib.ChatChannel_Say)
+			local tEmoteFiltered, strEmbeddedEmote
+			if bEmoteOrSay then
+				tEmoteFiltered = Killroy:ParseForAnimatedEmote(strTargetFiltered)
+				strEmbeddedEmote = tEmoteFiltered["strEmbeddedEmote"]
+			end
+
+			strMessage = strTargetFiltered
 			channelChecking:Send(strMessage)
 			
 			if strEmbeddedEmote then
@@ -1300,10 +1306,13 @@ function Killroy:Change_OnChatMessage()
 		
 		local bKillMessage = false
 		
-		--filter to remove {} from stream
-		for idx, this_segment in ipairs(tQueuedMessage.tMessage.arMessageSegments) do
-			local tFiltered = Killroy:ParseForAnimatedEmote(this_segment.strText)
-			this_segment.strText = tFiltered["strTextClean"]
+		--filter to remove {} from stream, if and only if in Say or Emote
+		bEmoteOrSay = bChannelTest1 or bChannelTest2
+		if bEmoteOrSay then
+			for idx, this_segment in ipairs(tQueuedMessage.tMessage.arMessageSegments) do
+				local tFiltered = Killroy:ParseForAnimatedEmote(this_segment.strText)
+				this_segment.strText = tFiltered["strTextClean"]
+			end
 		end
 		
 		--skip animated emote test
@@ -1316,7 +1325,9 @@ function Killroy:Change_OnChatMessage()
 			if Killroy.tPrefs["bRangeFilter"] then
 				for idx, tSegment in ipairs( tQueuedMessage.tMessage.arMessageSegments ) do
 					local strText = tSegment.strText
-					strText = Killroy:RangeFilter(strText, tQueuedMessage.tMessage.unitSource:GetName(), eChannelType)
+					if tQueuedMessage.tMessage.unitSource then
+						strText = Killroy:RangeFilter(strText, tQueuedMessage.tMessage.unitSource:GetName(), eChannelType)
+					end
 					if not(strText) then
 						bKillMessage = true
 					else
