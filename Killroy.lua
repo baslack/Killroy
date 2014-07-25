@@ -122,7 +122,7 @@ function Killroy:new(o)
 			kstrEmoteColor = ksDefaultEmoteColor,
 			kstrSayColor = ksDefaultSayColor,
 			kstrOOCColor 	= ksDefaultOOCColor,
-			sVersion = "1-3-9"
+			sVersion = "1-3-10"
 		}
 		self.tColorBuffer = 
 		{
