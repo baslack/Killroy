@@ -122,7 +122,7 @@ function Killroy:new(o)
 			kstrEmoteColor = ksDefaultEmoteColor,
 			kstrSayColor = ksDefaultSayColor,
 			kstrOOCColor 	= ksDefaultOOCColor,
-			sVersion = "1-3-10"
+			sVersion = "1-4-0"
 		}
 		self.tColorBuffer = 
 		{
@@ -136,6 +136,7 @@ function Killroy:new(o)
 			nFalloff = knDefaultFalloff,
 		}
 		self.arChatColor = {}
+		self.arRPChannels = {}
 	else
 		self.tColorBuffer = 
 		{
@@ -199,8 +200,6 @@ function Killroy:OnDocumentLoaded()
 	self:Change_OnChatMessage()
 	self:Change_VerifyChannelVisibility()
 
-	--self:Change_ActionBarFrame_OnMountBtn()
-	--self:RestoreMountSetting()
 	if self.tPrefs["bCustomChatColors"] then
 		self:Change_AddChannelTypeToList()
 		self:Append_OnChannelColorBtn()
@@ -213,6 +212,11 @@ function Killroy:OnDocumentLoaded()
 		self:Change_HelperFindAViewedChannel()
 		self:Change_OnSettings()
 		self.arChatColorTimer = ApolloTimer.Create(2, true, "arChatColor_Check", self)
+	end
+	
+	--RPChannelSetup
+	if table.maxn(self.arRPChannels) == 0 then
+		self:SetupRPChannels()
 	end
 end
 -----------------------------------------------------------------------------------------------
@@ -261,7 +265,10 @@ function Killroy:OnSave(eLevel)
 	if (eLevel == GameLib.CodeEnumAddonSaveLevel.Account) then
 		return {tPrefs = self.tPrefs,}
 	elseif (eLevel == GameLib.CodeEnumAddonSaveLevel.Character) then
-		return {arChatColor = self.arChatColor}
+		return {
+				arChatColor = self.arChatColor,
+				arRPChannels = self.arRPChannels
+				}
 	else
 		return nil
 	end
@@ -279,14 +286,87 @@ function Killroy:OnRestore(eLevel, tData)
 			self.arChatColor[i] = v
 		end
 	end
+	if (tData.arRPChannels ~= nil) then
+		for i,v in pairs(tData.arRPChannels) do
+			self.arRPChannels[i] = v
+		end
+	end
 end
 
 ----------------------------
 --Killroy Specific Functions
 ----------------------------
 
+function Killroy:DumpChannelNames()
+	for idx, this_chan in ipairs(ChatSystemLib.GetChannels()) do
+		local nType = self:ChannelCludge(this_chan:GetName(), this_chan:GetType())
+		local sName = this_chan:GetName()
+		Print(string.format("%s:%i", sName, nType))
+	end
+end
+
+function Killroy:SetupRPChannels()
+	local channels = ChatSystemLib.GetChannels()
+	for i, this_chan in ipairs(channels) do
+		local bRPChanDefault = (this_chan:GetType() == ChatSystemLib.ChatChannel_Say) or 
+							   (this_chan:GetType() == ChatSystemLib.ChatChannel_Emote) or 
+							   (this_chan:GetType() == ChatSystemLib.ChatChannel_Guild)
+		if bRPChanDefault then
+			self:SetRPChannel(this_chan, true)
+		else
+			self:SetRPChannel(this_chan, false)
+		end
+	end
+	local system = self:GetChannelByName("System")
+	system:Post("Killroy: RPChannels Set to Defaults")
+end
+
+function Killroy:SetRPChannel(chan, bFlag)
+	nType = self:ChannelCludge(chan:GetName(), chan:GetType())
+	self.arRPChannels[nType] = bFlag
+	return nil	
+end
+
+function Killroy:GetRPChannels()
+	local tDump = {}
+	for nType, bFlag in pairs(self.arRPChannels) do
+		if bFlag then
+			table.insert(tDump, self:GetChannelByNumber(nType))
+		end
+	end
+	return tDump
+end
+
+function Killroy:GetRPChannelNames()
+	local tDump = {}
+	for nType, bFlag in pairs(self.arRPChannels) do
+		if bFlag then
+			table.insert(tDump, self:GetChannelByNumber(nType):GetName())
+		end
+	end
+	return tDump
+end
+
+function Killroy:IsRPChannel(channel)
+	local sChannelName = channel:GetName()
+	for idx, this_chan in ipairs(self:GetRPChannels()) do
+		if sChannelName == this_chan:GetName() then return true end
+	end
+	return false
+end
+
+function Killroy:GetChannelByNumber(nType)
+	bNotFound = true
+	for i, this_chan in ipairs(ChatSystemLib.GetChannels()) do
+		if nType == self:ChannelCludge(this_chan:GetName(), this_chan:GetType()) then
+			return this_chan
+		end
+	end
+	if bNotFound then return nil end
+end
+
 function Killroy:GetChannelByName(sName)
-	bNotFound = false
+	bNotFound = true
 	for i, this_chan in ipairs(ChatSystemLib.GetChannels()) do
 		if this_chan:GetName() == sName then return this_chan end
 	end
