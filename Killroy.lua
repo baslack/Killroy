@@ -87,9 +87,9 @@ local karChannelTypeToColor = -- TODO Merge into one table like this
 local ktDefaultHolds = {}
 ktDefaultHolds[ChatSystemLib.ChatChannel_Whisper] = true
 
-local tagEmo = 1
-local tagSay = 2
-local tagOOC = 3
+local tagEmo = ChatSystemLib.ChatChannel_Emote
+local tagSay = ChatSystemLib.ChatChannel_Say
+local tagOOC = 101
 
 local knDefaultSayRange = 30
 local knDefaultEmoteRange = 60
@@ -426,6 +426,7 @@ function Killroy:ParseForContext(strText, eChannelType)
 	-- search for OOC '((<verbage>))'
 	-- color remainder with channel color
 	
+	--[[
 	function tagByChan()
 		if eChannelType == ChatSystemLib.ChatChannel_Say then
 			return tagSay
@@ -434,6 +435,11 @@ function Killroy:ParseForContext(strText, eChannelType)
 		else
 			return nil
 		end
+	end
+	]]--
+
+	function tagByChan()
+		return eChannelType
 	end
 	
 	local parsedText = {}
@@ -503,13 +509,23 @@ function Killroy:ParseForContext(strText, eChannelType)
 end
 
 function Killroy:DumpToChat(parsedText, strChatFont, xml)
+	ChatLog = Apollo.GetAddon("ChatLog")
+	if not ChatLog then return nil end
+	
 	for i,t in ipairs(parsedText) do
+		--[[
 		if t[2] == tagEmo then
 			xml:AppendText(t[1], self.tPrefs['kstrEmoteColor'], strChatFont)
 		elseif t[2] == tagSay then
 			xml:AppendText(t[1], self.tPrefs['kstrSayColor'], strChatFont)
 		elseif t[2] == tagOOC then
 			xml:AppendText(t[1], self.tPrefs['kstrOOCColor'], strChatFont)
+		end
+		]]--
+		if t[2] == tagOOC then
+			xml:AppendText(t[1], self.tPrefs['kstrOOCColor'], strChatFont)
+		else
+			xml:AppendText(t[1], ChatLog.arChatColor[t[2]], strChatFont)
 		end
 	end
 	return true
@@ -1658,9 +1674,12 @@ function Killroy:Change_HelperGenerateChatMessage()
 					end
 				end
 
+				local bInRPChannel = Killroy:IsRPChannel(Killroy:GetChannelByNumber(eChannelType))
+				
 				if next(tLink) == nil then
-					-- bs:051414, incorportating preferences
-					if Killroy.tPrefs['bFormatChat'] and ((eChannelType == ChatSystemLib.ChatChannel_Say) or (eChannelType == ChatSystemLib.ChatChannel_Emote)) then
+					-- bs:073014, reworking parse for RPChannels
+					-- if Killroy.tPrefs['bFormatChat'] and ((eChannelType == ChatSystemLib.ChatChannel_Say) or (eChannelType == ChatSystemLib.ChatChannel_Emote)) then
+					if Killroy.tPrefs['bFormatChat'] and bInRPChannel then		
 						parsedText = Killroy:ParseForContext(strText, eChannelType)
 						Killroy:DumpToChat(parsedText, strChatFont, xml)
 					elseif Killroy.tPrefs['bFormatChat'] and (eChannelType == ChatSystemLib.ChatChannel_AnimatedEmote) then
@@ -1676,7 +1695,7 @@ function Killroy:Change_HelperGenerateChatMessage()
 				end
 
 				if xmlBubble then
-					if Killroy.tPrefs['bFormatChat'] and ((eChannelType == ChatSystemLib.ChatChannel_Say) or (eChannelType == ChatSystemLib.ChatChannel_Emote)) then
+					if Killroy.tPrefs['bFormatChat'] and bInRPChannel then
 						parsedText = Killroy:ParseForContext(strText, eChannelType)
 						Killroy:DumpToChat(parsedText, strBubbleFont, xmlBubble)
 					else
