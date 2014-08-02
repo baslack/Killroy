@@ -122,7 +122,10 @@ function Killroy:new(o)
 			kstrEmoteColor = ksDefaultEmoteColor,
 			kstrSayColor = ksDefaultSayColor,
 			kstrOOCColor 	= ksDefaultOOCColor,
-			sVersion = "1-4-0"
+			nICBlend = 1.0,
+			nEmoteBlend = 1.0,
+			nOOCBlend = 1.0,
+			sVersion = "1-4-1"
 		}
 		self.tColorBuffer = 
 		{
@@ -192,6 +195,9 @@ function Killroy:OnDocumentLoaded()
 	Apollo.RegisterEventHandler('OnSetEmoteColor', OnSetEmoteColor, self)
 	Apollo.RegisterEventHandler('OnSetSayColor', OnSetSayColor, self)
 	Apollo.RegisterEventHandler('OnSetOOCColor', OnSetOOCColor, self)
+	Apollo.RegisterEventHandler("OnICBlend", OnICBlend, self)
+	Apollo.RegisterEventHandler("OnEmoteBlend", OnEmoteBlend, self)
+	Apollo.RegisterEventHandler("OnOOCBlend", OnOOCBlend, self)
 	
 	-- replace ChatLogFunctions
 	self:Change_HelperGenerateChatMessage()
@@ -203,6 +209,7 @@ function Killroy:OnDocumentLoaded()
 	if self.tPrefs["bCustomChatColors"] then
 		self:Change_AddChannelTypeToList()
 		self:Append_OnChannelColorBtn()
+		self:Append_OnRPChannel()
 		self:Change_OnViewCheck()
 		self:Change_NewChatWindow()
 		self:Change_OnInputChanged()
@@ -235,15 +242,15 @@ function Killroy:arChatColor_Check()
 end
 
 function Killroy:OnConfigure()
-	self.wndMain:FindChild('bCrossFaction'):SetCheck(not(self.tPrefs['bCrossFaction']))
-	self.wndMain:FindChild('bRPOnly'):SetCheck(not(self.tPrefs['bRPOnly']))
-	self.wndMain:FindChild('bFormatChat'):SetCheck(not(self.tPrefs['bFormatChat']))
-	self.wndMain:FindChild('bRangeFilter'):SetCheck(not(self.tPrefs['bRangeFilter']))
-	self.wndMain:FindChild('bUseOcclusion'):SetCheck(not(self.tPrefs['bUseOcclusion']))
-	self.wndMain:FindChild('bCustomChatColors'):SetCheck(not(self.tPrefs['bCustomChatColors']))
-	self.wndMain:FindChild('setEmoteColor'):SetNormalTextColor(self.tPrefs['kstrEmoteColor'])
-	self.wndMain:FindChild('setSayColor'):SetNormalTextColor(self.tPrefs['kstrSayColor'])
-	self.wndMain:FindChild('setOOCColor'):SetNormalTextColor(self.tPrefs['kstrOOCColor'])
+	self.wndMain:FindChild('bCrossFaction'):SetCheck(self.tPrefs['bCrossFaction'])
+	self.wndMain:FindChild('bRPOnly'):SetCheck(self.tPrefs['bRPOnly'])
+	self.wndMain:FindChild('bFormatChat'):SetCheck(self.tPrefs['bFormatChat'])
+	self.wndMain:FindChild('bRangeFilter'):SetCheck(self.tPrefs['bRangeFilter'])
+	self.wndMain:FindChild('bUseOcclusion'):SetCheck(self.tPrefs['bUseOcclusion'])
+	self.wndMain:FindChild('bCustomChatColors'):SetCheck(self.tPrefs['bCustomChatColors'])
+	self.wndMain:FindChild('setEmoteColor'):SetBGColor(self.tPrefs['kstrEmoteColor'])
+	self.wndMain:FindChild('setSayColor'):SetBGColor(self.tPrefs['kstrSayColor'])
+	self.wndMain:FindChild('setOOCColor'):SetBGColor(self.tPrefs['kstrOOCColor'])
 	self.wndMain:FindChild('nSayRange'):SetValue(self.tPrefs['nSayRange'])
 	self.tRFBuffer['nSayRange'] = self.tPrefs['nSayRange']
 	self.wndMain:FindChild('nEmoteRange'):SetValue(self.tPrefs['nEmoteRange'])
@@ -1106,7 +1113,8 @@ function Killroy:Change_NewChatWindow()
 		Killroy = Apollo.GetAddon("Killroy")
 		if not Killroy then return nil end	
 	
-		local wndChatWindow = Apollo.LoadForm(self.xmlDoc, "ChatWindow", "FixedHudStratum", self)
+		-- replaced in most recent chat log with next line , local wndChatWindow = Apollo.LoadForm(self.xmlDoc, "ChatWindow", "FixedHudStratum", self)
+		local wndChatWindow = Apollo.LoadForm(self.xmlDoc, "ChatWindow", "FixedHudStratumHigh", self)
 		Event_FireGenericEvent("WindowManagementAdd", {wnd = wndChatWindow, strName = strTitle})
 	
 		wndChatWindow:SetSizingMinimum(240, 240)
@@ -1320,6 +1328,14 @@ function Killroy:Change_AddChannelTypeToList()
 		else
 			CCB:SetBGColor(self.arChatColor[ChatSystemLib.ChatChannel_Custom])
 			self.arChatColor[nCludge] = self.arChatColor[ChatSystemLib.ChatChannel_Custom]
+		end
+		
+		-- populate the default state of the RPChanBtn
+		local RPChanBtn = wndChannelItem:FindChild("bRPChannel")
+		if Killroy:IsRPChannel(Killroy:GetChannelByNumber(nCludge)) then
+			RPChanBtn:SetCheck(true)
+		else
+			RPChanBtn:SetCheck(false)
 		end
 	end
 end
@@ -1822,12 +1838,12 @@ end
 -- when the OK button is clicked
 function Killroy:OnOK()
 	self.wndMain:Close() -- hide the window
-	self.tPrefs['bCrossFaction'] = not(self.wndMain:FindChild('bCrossFaction'):IsChecked())
-	self.tPrefs['bRPOnly'] = not(self.wndMain:FindChild('bRPOnly'):IsChecked())
-	self.tPrefs['bFormatChat'] = not(self.wndMain:FindChild('bFormatChat'):IsChecked())
-	self.tPrefs['bRangeFilter'] = not(self.wndMain:FindChild('bRangeFilter'):IsChecked())
-	self.tPrefs['bUseOcclusion'] = not(self.wndMain:FindChild('bUseOcclusion'):IsChecked())
-	self.tPrefs['bCustomChatColors'] = not(self.wndMain:FindChild('bCustomChatColors'):IsChecked())
+	self.tPrefs['bCrossFaction'] = (self.wndMain:FindChild('bCrossFaction'):IsChecked())
+	self.tPrefs['bRPOnly'] = (self.wndMain:FindChild('bRPOnly'):IsChecked())
+	self.tPrefs['bFormatChat'] = (self.wndMain:FindChild('bFormatChat'):IsChecked())
+	self.tPrefs['bRangeFilter'] = (self.wndMain:FindChild('bRangeFilter'):IsChecked())
+	self.tPrefs['bUseOcclusion'] = (self.wndMain:FindChild('bUseOcclusion'):IsChecked())
+	self.tPrefs['bCustomChatColors'] = (self.wndMain:FindChild('bCustomChatColors'):IsChecked())
 	self.tPrefs['kstrEmoteColor'] = self.tColorBuffer['kstrEmoteColor']
 	self.tPrefs['kstrSayColor'] = self.tColorBuffer['kstrSayColor']
 	self.tPrefs['kstrOOCColor'] = self.tColorBuffer['kstrOOCColor']
@@ -1844,12 +1860,12 @@ end
 -- when the Cancel button is clicked
 function Killroy:OnCancel()
 	self.wndMain:Close() -- hide the window
-	self.wndMain:FindChild('bCrossFaction'):SetCheck(not(self.tPrefs['bCrossFaction']))
-	self.wndMain:FindChild('bRPOnly'):SetCheck(not(self.tPrefs['bRPOnly']))
-	self.wndMain:FindChild('bFormatChat'):SetCheck(not(self.tPrefs['bFormat']))
-	self.wndMain:FindChild('bRangeFilter'):SetCheck(not(self.tPrefs['bRangeFilter']))
-	self.wndMain:FindChild('bUseOcclusion'):SetCheck(not(self.tPrefs['bUseOcclusion']))
-	self.wndMain:FindChild('bCustomChatColors'):SetCheck(not(self.tPrefs['bCustomChatColors']))
+	self.wndMain:FindChild('bCrossFaction'):SetCheck(self.tPrefs['bCrossFaction'])
+	self.wndMain:FindChild('bRPOnly'):SetCheck(self.tPrefs['bRPOnly'])
+	self.wndMain:FindChild('bFormatChat'):SetCheck(self.tPrefs['bFormat'])
+	self.wndMain:FindChild('bRangeFilter'):SetCheck(self.tPrefs['bRangeFilter'])
+	self.wndMain:FindChild('bUseOcclusion'):SetCheck(self.tPrefs['bUseOcclusion'])
+	self.wndMain:FindChild('bCustomChatColors'):SetCheck(self.tPrefs['bCustomChatColors'])
 	self.tColorBuffer['kstrEmoteColor'] = self.tPrefs['kstrEmoteColor'] 
 	self.tColorBuffer['kstrSayColor'] = self.tPrefs['kstrSayColor']
 	self.tColorBuffer['kstrOOCColor'] = self.tPrefs['kstrOOCColor']
@@ -1866,7 +1882,7 @@ end
 
 function Killroy:OnSetOOCColorOk(hexcolor)
 	self.tColorBuffer['kstrOOCColor'] = hexcolor
-	self.wndMain:FindChild('setOOCColor'):SetNormalTextColor(hexcolor)
+	self.wndMain:FindChild('setOOCColor'):SetBGColor(hexcolor)
 end
 
 function Killroy:OnSetEmoteColor( wndHandler, wndControl, eMouseButton )
@@ -1876,7 +1892,7 @@ end
 
 function Killroy:OnSetEmoteColorOk(hexcolor)
 	self.tColorBuffer['kstrEmoteColor'] = hexcolor
-	self.wndMain:FindChild('setEmoteColor'):SetNormalTextColor(hexcolor)
+	self.wndMain:FindChild('setEmoteColor'):SetBGColor(hexcolor)
 end
 
 function Killroy:OnSetSayColor( wndHandler, wndControl, eMouseButton )
@@ -1886,7 +1902,7 @@ end
 
 function Killroy:OnSetSayColorOk(hexcolor)
 	self.tColorBuffer['kstrSayColor'] = hexcolor
-	self.wndMain:FindChild('setSayColor'):SetNormalTextColor(hexcolor)
+	self.wndMain:FindChild('setSayColor'):SetBGColor(hexcolor)
 end
 
 function Killroy:OnRangeSlider( wndHandler, wndControl, fNewValue, fOldValue )
@@ -1896,6 +1912,12 @@ end
 
 function Killroy:OnCustomChatColorsChanged( wndHandler, wndControl, eMouseButton )
 	self.bReloadUIRequired = true
+end
+
+function Killroy:OnICBlend( wndHandler, wndControl, fNewValue, fOldValue )
+end
+
+function Killroy:OnEmoteBlend( wndHandler, wndControl, fNewValue, fOldValue )
 end
 
 ---------------------------------------------------------------------------------------------------
@@ -1923,6 +1945,29 @@ function Killroy:Append_OnChannelColorBtn()
 		self.arChatColor[nChannel] = ApolloColor.new(hexcolor)
 		wndControl:SetBGColor(self.arChatColor[nChannel])
 	end
+end
+
+function Killroy:Append_OnRPChannel()
+	ChatLog = Apollo.GetAddon("ChatLog")
+	if not ChatLog then return nil end
+	Apollo.RegisterEventHandler("OnRPChannel", OnRPChannel, ChatLog)
+	
+	function ChatLog:OnRPChannel( wndHandler, wndControl, eMouseButton )
+		Killroy = Apollo.GetAddon("Killroy")
+		if not Killroy then return nil end
+		
+		-- Get the channel number embedded in the form
+		wndChatType = wndControl:GetParent()
+		nChannel = wndChatType:GetData()
+		
+		-- Get the channel, then use the Killroy method to set it
+		RPChannel = Killroy:GetChannelByNumber(nChannel)
+		Killroy:SetRPChannel(RPChannel, wndControl:IsChecked())
+		-- Print("OnRPChannel: %s, RPChannel: %s", wndChatType:GetName(), RPChannel:GetName())
+	end
+end
+
+function Killroy:OnRPChannel( wndHandler, wndControl, eMouseButton )
 end
 
 -----------------------------------------------------------------------------------------------
