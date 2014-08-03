@@ -87,9 +87,9 @@ local karChannelTypeToColor = -- TODO Merge into one table like this
 local ktDefaultHolds = {}
 ktDefaultHolds[ChatSystemLib.ChatChannel_Whisper] = true
 
-local tagEmo = ChatSystemLib.ChatChannel_Emote
-local tagSay = ChatSystemLib.ChatChannel_Say
-local tagOOC = 101
+local tagEmo = 101
+local tagSay = 102
+local tagOOC = 103
 
 local knDefaultSayRange = 30
 local knDefaultEmoteRange = 60
@@ -97,6 +97,9 @@ local knDefaultFalloff = 5
 local ksDefaultEmoteColor = 'ffff9900'
 local ksDefaultSayColor = 'ffffffff'
 local ksDefaultOOCColor = 'ff7fffb9'
+local knDefaultICBlend = 1.0
+local knDefaultEmoteBlend = 1.0
+local knDefaultOOCBlend = 1.0
 
 -----------------------------------------------------------------------------------------------
 -- Initialization
@@ -122,10 +125,11 @@ function Killroy:new(o)
 			kstrEmoteColor = ksDefaultEmoteColor,
 			kstrSayColor = ksDefaultSayColor,
 			kstrOOCColor 	= ksDefaultOOCColor,
-			nICBlend = 1.0,
-			nEmoteBlend = 1.0,
-			nOOCBlend = 1.0,
-			sVersion = "1-4-1"
+			nICBlend = knDefaultICBlend,
+			nEmoteBlend = knDefaultEmoteBlend,
+			nOOCBlend = knDefaultOOCBlend,
+			bLegacy = true,
+			sVersion = "1-4-3"
 		}
 		self.tColorBuffer = 
 		{
@@ -137,6 +141,11 @@ function Killroy:new(o)
 			nSayRange = knDefaultSayRange,
 			nEmoteRange = knDefaultEmoteRange,
 			nFalloff = knDefaultFalloff,
+		}
+		self.tBlendBuffer = {
+			nICBlend = knDefaultICBlend,
+			nEmoteBlend = knDefaultEmoteBlend,
+			nOOCBlend = knDefaultOOCBlend,			
 		}
 		self.arChatColor = {}
 		self.arRPChannels = {}
@@ -152,6 +161,11 @@ function Killroy:new(o)
 			nSayRange = self.tPrefs['nSayRange'],
 			nEmoteRange = self.tPrefs['nEmoteRange'],
 			nFalloff = self.tPrefs['nFalloff'],
+		}
+		self.tBlendBuffer = {
+			nICBlend = self.tPrefs['nICBlend'],
+			nEmoteBlend = self.tPrefs['nEmoteBlend'],
+			nOOCBlend = self.tPrefs['nOOCBlend'],
 		}
 	end
 	
@@ -249,8 +263,11 @@ function Killroy:OnConfigure()
 	self.wndMain:FindChild('bUseOcclusion'):SetCheck(self.tPrefs['bUseOcclusion'])
 	self.wndMain:FindChild('bCustomChatColors'):SetCheck(self.tPrefs['bCustomChatColors'])
 	self.wndMain:FindChild('setEmoteColor'):SetBGColor(self.tPrefs['kstrEmoteColor'])
+	self.wndMain:FindChild('nEmoteBlend'):SetValue(self.tPrefs['nEmoteBlend'])
 	self.wndMain:FindChild('setSayColor'):SetBGColor(self.tPrefs['kstrSayColor'])
+	self.wndMain:FindChild('nICBlend'):SetValue(self.tPrefs['nICBlend'])
 	self.wndMain:FindChild('setOOCColor'):SetBGColor(self.tPrefs['kstrOOCColor'])
+	self.wndMain:FindChild('nOOCBlend'):SetValue(self.tPrefs['nOOCBlend'])
 	self.wndMain:FindChild('nSayRange'):SetValue(self.tPrefs['nSayRange'])
 	self.tRFBuffer['nSayRange'] = self.tPrefs['nSayRange']
 	self.wndMain:FindChild('nEmoteRange'):SetValue(self.tPrefs['nEmoteRange'])
@@ -515,24 +532,53 @@ function Killroy:ParseForContext(strText, eChannelType)
 	
 end
 
-function Killroy:DumpToChat(parsedText, strChatFont, xml)
+function Killroy:ABOverColor(A, B, nBlend)
+	-- requires A,B be ApolloColor Objects
+	-- nBlend is a float
+	
+	local tA = A:ToTable()
+	local tB = B:ToTable()
+	local tBlend = {}
+	
+	for index,value in pairs(tA) do
+		tBlend[index] = (1-nBlend)*tA[index] + nBlend*tB[index]
+	end
+	
+	local sHex = self:toHex(tBlend)
+	return ApolloColor.new(sHex)
+end
+
+function Killroy:DumpToChat(parsedText, nChannel, strChatFont, xml)
 	ChatLog = Apollo.GetAddon("ChatLog")
 	if not ChatLog then return nil end
-	
-	for i,t in ipairs(parsedText) do
-		--[[
-		if t[2] == tagEmo then
-			xml:AppendText(t[1], self.tPrefs['kstrEmoteColor'], strChatFont)
-		elseif t[2] == tagSay then
-			xml:AppendText(t[1], self.tPrefs['kstrSayColor'], strChatFont)
-		elseif t[2] == tagOOC then
-			xml:AppendText(t[1], self.tPrefs['kstrOOCColor'], strChatFont)
-		end
-		]]--
-		if t[2] == tagOOC then
-			xml:AppendText(t[1], self.tPrefs['kstrOOCColor'], strChatFont)
+
+	function Legacy(nChannel, nBlend)
+		local bIsSay = nChannel == ChatSystemLib.ChatChannel_Say
+		local bIsEmote = nChannel == ChatSystemLib.ChatChannel_Emote
+		
+		if (bIsSay or bIsEmote) and self.tPrefs['bLegacy'] then
+			return 1.0
 		else
-			xml:AppendText(t[1], ChatLog.arChatColor[t[2]], strChatFont)
+			return nBlend
+		end
+	end
+	
+	local AC_OOC = ApolloColor.new(self.tPrefs['kstrOOCColor'])
+	local AC_IC = ApolloColor.new(self.tPrefs['kstrSayColor'])
+	local AC_EMO = ApolloColor.new(self.tPrefs['kstrEmoteColor'])	
+	local AC_BlendColorOOC = self:ABOverColor(ChatLog.arChatColor[nChannel], AC_OOC, Legacy(nChannel, self.tPrefs['nOOCBlend']))
+	local AC_BlendColorEmote = self:ABOverColor(ChatLog.arChatColor[nChannel], AC_EMO, Legacy(nChannel, self.tPrefs['nEmoteBlend']))
+	local AC_BlendColorIC = self:ABOverColor(ChatLog.arChatColor[nChannel], AC_IC, Legacy(nChannel, self.tPrefs['nICBlend']))
+		
+	for i,t in ipairs(parsedText) do
+		if t[2] == tagEmo then
+			xml:AppendText(t[1], AC_BlendColorEmote, strChatFont)
+		elseif t[2] == tagSay then
+			xml:AppendText(t[1], AC_BlendColorIC, strChatFont)
+		elseif t[2] == tagOOC then
+			xml:AppendText(t[1], AC_BlendColorOOC, strChatFont)
+		else
+			xml:AppendText(t[1], AC_BlendColorIC, strChatFont)
 		end
 	end
 	return true
@@ -1697,7 +1743,7 @@ function Killroy:Change_HelperGenerateChatMessage()
 					-- if Killroy.tPrefs['bFormatChat'] and ((eChannelType == ChatSystemLib.ChatChannel_Say) or (eChannelType == ChatSystemLib.ChatChannel_Emote)) then
 					if Killroy.tPrefs['bFormatChat'] and bInRPChannel then		
 						parsedText = Killroy:ParseForContext(strText, eChannelType)
-						Killroy:DumpToChat(parsedText, strChatFont, xml)
+						Killroy:DumpToChat(parsedText, eChannelType, strChatFont, xml)
 					elseif Killroy.tPrefs['bFormatChat'] and (eChannelType == ChatSystemLib.ChatChannel_AnimatedEmote) then
 						xml:AppendText(strText, Killroy.tPrefs['kstrEmoteColor'], strChatFont)
 					else
@@ -1713,7 +1759,7 @@ function Killroy:Change_HelperGenerateChatMessage()
 				if xmlBubble then
 					if Killroy.tPrefs['bFormatChat'] and bInRPChannel then
 						parsedText = Killroy:ParseForContext(strText, eChannelType)
-						Killroy:DumpToChat(parsedText, strBubbleFont, xmlBubble)
+						Killroy:DumpToChat(parsedText, eChannelType, strBubbleFont, xmlBubble)
 					else
 						xmlBubble:AppendText(strText, crBubbleText, strChatFont)
 					end
@@ -1850,6 +1896,10 @@ function Killroy:OnOK()
 	self.tPrefs['nSayRange'] = self.tRFBuffer['nSayRange']
 	self.tPrefs['nEmoteRange'] = self.tRFBuffer['nEmoteRange']
 	self.tPrefs['nFalloff'] = self.tRFBuffer['nFalloff']
+	self.tPrefs['nICBlend'] = self.tBlendBuffer['nICBlend']
+	self.tPrefs['nEmoteBlend'] = self.tBlendBuffer['nEmoteBlend']
+	self.tPrefs['nOOCBlend'] = self.tBlendBuffer['nOOCBlend']
+	-- reloadui if custom chat disabled
 	if self.bReloadUIRequired then
 		self.bReloadUIRequired = false
 		local ComChan = self:GetChannelByName("Command")
@@ -1872,6 +1922,9 @@ function Killroy:OnCancel()
 	self.tRFBuffer['nSayRange'] = self.tPrefs['nSayRange']
 	self.tRFBuffer['nEmoteRange'] = self.tPrefs['nEmoteRange']
 	self.tRFBuffer['nFalloff'] = self.tPrefs['nFalloff']
+	self.tBlendBuffer['nICBlend'] = self.tPrefs['nICBlend']
+	self.tBlendBuffer['nEmoteBlend'] = self.tPrefs['nEmoteBlend']
+	self.tBlendBuffer['nOOCBlend'] = self.tPrefs['nOOCBlend']
 	self.bReloadUIRequired = false
 end
 
@@ -1914,10 +1967,9 @@ function Killroy:OnCustomChatColorsChanged( wndHandler, wndControl, eMouseButton
 	self.bReloadUIRequired = true
 end
 
-function Killroy:OnICBlend( wndHandler, wndControl, fNewValue, fOldValue )
-end
-
-function Killroy:OnEmoteBlend( wndHandler, wndControl, fNewValue, fOldValue )
+function Killroy:OnBlendSlider( wndHandler, wndControl, fNewValue, fOldValue )
+	sName = wndControl:GetName()
+	self.tBlendBuffer[sName] = fNewValue
 end
 
 ---------------------------------------------------------------------------------------------------
@@ -1965,9 +2017,6 @@ function Killroy:Append_OnRPChannel()
 		Killroy:SetRPChannel(RPChannel, wndControl:IsChecked())
 		-- Print("OnRPChannel: %s, RPChannel: %s", wndChatType:GetName(), RPChannel:GetName())
 	end
-end
-
-function Killroy:OnRPChannel( wndHandler, wndControl, eMouseButton )
 end
 
 -----------------------------------------------------------------------------------------------
