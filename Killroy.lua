@@ -206,6 +206,7 @@ function Killroy:OnDocumentLoaded()
 	--register commands and actions
 	Apollo.RegisterSlashCommand("killroy", "OnKillroyOn", self)
 	Apollo.RegisterSlashCommand("klabout", "KillroyAbout", self)
+	Apollo.RegisterSlashCommand("kl", "KillroyTest", self)
 	Apollo.RegisterEventHandler('OnSetEmoteColor', OnSetEmoteColor, self)
 	Apollo.RegisterEventHandler('OnSetSayColor', OnSetSayColor, self)
 	Apollo.RegisterEventHandler('OnSetOOCColor', OnSetOOCColor, self)
@@ -256,6 +257,7 @@ function Killroy:arChatColor_Check()
 end
 
 function Killroy:OnConfigure()
+	self.wndMain:FindChild('sVersion'):SetText(self.tPrefs['sVersion'])
 	self.wndMain:FindChild('bCrossFaction'):SetCheck(self.tPrefs['bCrossFaction'])
 	self.wndMain:FindChild('bRPOnly'):SetCheck(self.tPrefs['bRPOnly'])
 	self.wndMain:FindChild('bFormatChat'):SetCheck(self.tPrefs['bFormatChat'])
@@ -263,6 +265,7 @@ function Killroy:OnConfigure()
 	self.wndMain:FindChild('bUseOcclusion'):SetCheck(self.tPrefs['bUseOcclusion'])
 	self.wndMain:FindChild('bCustomChatColors'):SetCheck(self.tPrefs['bCustomChatColors'])
 	self.wndMain:FindChild('setEmoteColor'):SetBGColor(self.tPrefs['kstrEmoteColor'])
+	self.wndMain:FindChild('bLegacy'):SetCheck(self.tPrefs['bLegacy'])
 	self.wndMain:FindChild('nEmoteBlend'):SetValue(self.tPrefs['nEmoteBlend'])
 	self.wndMain:FindChild('setSayColor'):SetBGColor(self.tPrefs['kstrSayColor'])
 	self.wndMain:FindChild('nICBlend'):SetValue(self.tPrefs['nICBlend'])
@@ -315,6 +318,8 @@ function Killroy:OnRestore(eLevel, tData)
 			self.arRPChannels[i] = v
 		end
 	end
+	
+	self.tPrefs['sVersion'] = "1-4-3"
 end
 
 ----------------------------
@@ -400,6 +405,24 @@ end
 function Killroy:KillroyAbout()
 	local SystemChannel = self:GetChannelByName("System")
 	SystemChannel:Post(string.format("Killroy Version: %s", self.tPrefs["sVersion"]))
+end
+
+function Killroy:KillroyTest(...)
+	-- to become "kl" will allow you to control features of Killroy from the command line
+	
+	--ex. /kl -rp guild should parse out the tokens and run the toggle RP channel on the guild channel
+	-- commands will use "-command" syntax arguments to follow will need to be strings which will then parse to tables
+	--ex. /kl -rp <channelname>, <channelname2> needs to parse into {-rp,<channelname>,...}
+	
+	--Parse Command and Arguments
+	local tokens = {}
+	if arg[2] then
+		sRaw = arg[2]
+	else
+		--no flags, prompt user with help message
+	end
+	
+	--Execite Commands
 end
 
 function Killroy:ParseForAnimatedEmote(strText)
@@ -1890,6 +1913,7 @@ function Killroy:OnOK()
 	self.tPrefs['bRangeFilter'] = (self.wndMain:FindChild('bRangeFilter'):IsChecked())
 	self.tPrefs['bUseOcclusion'] = (self.wndMain:FindChild('bUseOcclusion'):IsChecked())
 	self.tPrefs['bCustomChatColors'] = (self.wndMain:FindChild('bCustomChatColors'):IsChecked())
+	self.tPrefs['bLegacy'] = (self.wndMain:FindChild('bLegacy'):IsChecked())
 	self.tPrefs['kstrEmoteColor'] = self.tColorBuffer['kstrEmoteColor']
 	self.tPrefs['kstrSayColor'] = self.tColorBuffer['kstrSayColor']
 	self.tPrefs['kstrOOCColor'] = self.tColorBuffer['kstrOOCColor']
@@ -1916,6 +1940,7 @@ function Killroy:OnCancel()
 	self.wndMain:FindChild('bRangeFilter'):SetCheck(self.tPrefs['bRangeFilter'])
 	self.wndMain:FindChild('bUseOcclusion'):SetCheck(self.tPrefs['bUseOcclusion'])
 	self.wndMain:FindChild('bCustomChatColors'):SetCheck(self.tPrefs['bCustomChatColors'])
+	self.wndMain:FindChild('bLegacy'):SetCheck(self.tPrefs['bLegacy'])
 	self.tColorBuffer['kstrEmoteColor'] = self.tPrefs['kstrEmoteColor'] 
 	self.tColorBuffer['kstrSayColor'] = self.tPrefs['kstrSayColor']
 	self.tColorBuffer['kstrOOCColor'] = self.tPrefs['kstrOOCColor']
