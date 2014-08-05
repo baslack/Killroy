@@ -129,7 +129,7 @@ function Killroy:new(o)
 			nEmoteBlend = knDefaultEmoteBlend,
 			nOOCBlend = knDefaultOOCBlend,
 			bLegacy = true,
-			sVersion = "1-4-3"
+			sVersion = "1-4-4"
 		}
 		self.tColorBuffer = 
 		{
@@ -206,7 +206,7 @@ function Killroy:OnDocumentLoaded()
 	--register commands and actions
 	Apollo.RegisterSlashCommand("killroy", "OnKillroyOn", self)
 	Apollo.RegisterSlashCommand("klabout", "KillroyAbout", self)
-	Apollo.RegisterSlashCommand("kl", "KillroyTest", self)
+	Apollo.RegisterSlashCommand("kl", "Command", self)
 	Apollo.RegisterEventHandler('OnSetEmoteColor', OnSetEmoteColor, self)
 	Apollo.RegisterEventHandler('OnSetSayColor', OnSetSayColor, self)
 	Apollo.RegisterEventHandler('OnSetOOCColor', OnSetOOCColor, self)
@@ -319,7 +319,7 @@ function Killroy:OnRestore(eLevel, tData)
 		end
 	end
 	
-	self.tPrefs['sVersion'] = "1-4-3"
+	self.tPrefs['sVersion'] = "1-4-4"
 end
 
 ----------------------------
@@ -407,7 +407,7 @@ function Killroy:KillroyAbout()
 	SystemChannel:Post(string.format("Killroy Version: %s", self.tPrefs["sVersion"]))
 end
 
-function Killroy:KillroyTest(...)
+function Killroy:Command(...)
 	-- to become "kl" will allow you to control features of Killroy from the command line
 	
 	--ex. /kl -rp guild should parse out the tokens and run the toggle RP channel on the guild channel
@@ -415,14 +415,63 @@ function Killroy:KillroyTest(...)
 	--ex. /kl -rp <channelname>, <channelname2> needs to parse into {-rp,<channelname>,...}
 	
 	--Parse Command and Arguments
-	local tokens = {}
-	if arg[2] then
-		sRaw = arg[2]
-	else
-		--no flags, prompt user with help message
+	
+	function ArgToTable(sArgs)
+		tArgs = {}
+		for this_arg  in string.gmatch(sTest, "%s*([^,]+)%,*") do
+			table.insert(tArgs, this_arg)
+		end
+		return tArgs
 	end
 	
-	--Execite Commands
+	System = self:GetChannelByName("System")
+	
+	if arg[2] then
+		sRaw = arg[2]
+		-- parse out flags	
+		sFlag, sArgs = string.match(sRaw, "(%-%a+)%s*(.*)")
+		Print(tostring(sFlag).."|"..tostring(sArgs))
+		if sFlag then
+			if sArgs then
+				--getcolor, gets channel colors of channels sent to it
+				--setcolor, set channel colors of channels sent to it
+				--rp, toggles channels fed as arguments
+				if sFlag == "-rpon" then
+					--parse out arguments to channel names
+					arChannels = ChatSystemLib.GetChannels()
+					arChannelNames = {}
+					for index, this_channel in pairs(arChannels) do
+						table.insert(arChannelNames, this_channel:GetName())
+					end
+					for i,this_arg in ipairs(ArgToTable(sArgs)) do
+						for this_channel in pairs(arChannelNames) do
+							if this_arg == this_channel then
+								self:SetRPChannel(self:GetChannelByName(this_channel), true)
+							end
+						end
+						if this_word == "guild" then
+							self:SetRPChannel(self:GetChannelByNumber(ChatSystemLib.ChatChannel_Guild), true)
+						end
+					end
+				end
+				-- test command
+				if sFlag == "-test" then
+					Print(string.format("flag: %s, args: %s", sFlag, sArgs))
+				end
+				--rplist
+				if sFlag == "-rplist" then
+					tChannelList = self:GetRPChannelNames()
+					for index, this_name in ipairs(tChannelList) do
+						System:Post(string.format("Killroy: RP Channel, %s",this_name))
+					end
+				end
+			end
+		else
+			--throw usage error
+		end
+	else
+		--throw usage error
+	end
 end
 
 function Killroy:ParseForAnimatedEmote(strText)
@@ -601,7 +650,11 @@ function Killroy:DumpToChat(parsedText, nChannel, strChatFont, xml)
 		elseif t[2] == tagOOC then
 			xml:AppendText(t[1], AC_BlendColorOOC, strChatFont)
 		else
-			xml:AppendText(t[1], AC_BlendColorIC, strChatFont)
+			if nChannel == ChatSystemLib.ChatChannel_Emote then
+				xml:AppendText(t[1], AC_BlendColorEmote, strChatFont)
+			else
+				xml:AppendText(t[1], AC_BlendColorIC, strChatFont)
+			end
 		end
 	end
 	return true
@@ -1317,7 +1370,7 @@ function Killroy:Change_VerifyChannelVisibility()
 		if Killroy.tPrefs["bCustomChatColors"] then
 			nTestChannelType = self.tAllViewedChannels[ Killroy:ChannelCludge(channelChecking:GetName(), channelChecking:GetType()) ]
 		else
-			nTestChannelType = tChatData.tViewedChannels[ channelChecking:GetType() ]
+			nTestChannelType = self.tAllViewedChannels[ channelChecking:GetType() ]
 		end
 		
 		if nTestChannelType ~= nil then -- see if this channelChecking is viewed
