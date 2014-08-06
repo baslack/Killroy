@@ -418,10 +418,48 @@ function Killroy:Command(...)
 	
 	function ArgToTable(sArgs)
 		tArgs = {}
-		for this_arg  in string.gmatch(sTest, "%s*([^,]+)%,*") do
+		for this_arg  in string.gmatch(sArgs, "%s*([^,]+)%,*") do
 			table.insert(tArgs, this_arg)
 		end
 		return tArgs
+	end
+	
+	function RPOnOff(sArgs, bSetting)
+		--parse out arguments to channel names
+		arChannels = ChatSystemLib.GetChannels()
+		arChannelNames = {}
+		for index, this_channel in pairs(arChannels) do
+			table.insert(arChannelNames, this_channel:GetName())
+		end
+		for i,this_arg in ipairs(ArgToTable(sArgs)) do
+			--check against channel names
+			for i,this_channel in pairs(arChannelNames) do
+				pattern = ".*"..this_arg..".*"
+				mymatch = string.match(this_channel, pattern)
+				--Print(string.format("This Channel: %s, Pattern %s, Match: %s", tostring(this_channel), tostring(pattern), tostring(mymatch))) 
+				if mymatch then
+					self:SetRPChannel(self:GetChannelByName(this_channel), bSetting)
+				end 
+			end
+			-- check against keywords
+			if this_arg == "guild" then
+				self:SetRPChannel(self:GetChannelByNumber(ChatSystemLib.ChatChannel_Guild), bSetting)
+			elseif this_arg == "circle" then
+				for i, this_chan in ipairs(arChannels) do
+					if this_chan:GetType() == ChatSystemLib.ChatChannel_Society then
+						self:SetRPChannel(this_chan, bSetting)
+					end
+				end
+			elseif this_arg == "custom" then
+				for i, this_chan in ipairs(arChannels) do
+					if this_chan:GetType() == ChatSystemLib.ChatChannel_Custom then
+						self:SetRPChannel(this_chan, bSetting)
+					end
+				end
+			else
+				--throw usage message
+			end
+		end
 	end
 	
 	System = self:GetChannelByName("System")
@@ -430,40 +468,28 @@ function Killroy:Command(...)
 		sRaw = arg[2]
 		-- parse out flags	
 		sFlag, sArgs = string.match(sRaw, "(%-%a+)%s*(.*)")
-		Print(tostring(sFlag).."|"..tostring(sArgs))
+		--Print(tostring(sFlag).."|"..tostring(sArgs))
 		if sFlag then
 			if sArgs then
 				--getcolor, gets channel colors of channels sent to it
 				--setcolor, set channel colors of channels sent to it
 				--rp, toggles channels fed as arguments
 				if sFlag == "-rpon" then
-					--parse out arguments to channel names
-					arChannels = ChatSystemLib.GetChannels()
-					arChannelNames = {}
-					for index, this_channel in pairs(arChannels) do
-						table.insert(arChannelNames, this_channel:GetName())
-					end
-					for i,this_arg in ipairs(ArgToTable(sArgs)) do
-						for this_channel in pairs(arChannelNames) do
-							if this_arg == this_channel then
-								self:SetRPChannel(self:GetChannelByName(this_channel), true)
-							end
-						end
-						if this_word == "guild" then
-							self:SetRPChannel(self:GetChannelByNumber(ChatSystemLib.ChatChannel_Guild), true)
-						end
-					end
-				end
+					RPOnOff(sArgs,true)
+				elseif
+					sFlag == "-rpoff" then
+					RPOnOff(sArgs,false)
 				-- test command
-				if sFlag == "-test" then
+				elseif sFlag == "-test" then
 					Print(string.format("flag: %s, args: %s", sFlag, sArgs))
-				end
 				--rplist
-				if sFlag == "-rplist" then
+				elseif sFlag == "-rplist" then
 					tChannelList = self:GetRPChannelNames()
 					for index, this_name in ipairs(tChannelList) do
 						System:Post(string.format("Killroy: RP Channel, %s",this_name))
 					end
+				else
+					--throw usage message
 				end
 			end
 		else
@@ -1403,7 +1429,29 @@ function Killroy:Change_VerifyChannelVisibility()
 			end
 
 			strMessage = strTargetFiltered
+			--break up sends of more than 500 chars
+			if string.len(strMessage)>500 then
+				local tChunks = {}
+				local pattern = "%s*[^%s]+%s*"
+				local nLength = 0
+				local strCompile = ""
+				for this_word in string.gmatch(strMessage, pattern) do
+					nLength = nLength + string.len(this_word)
+					if nLength > 480 then
+						table.insert(tChunks, strCompile)
+						nLength = 0
+						strCompile = ""
+					end
+					strCompile = strCompile..this_word 
+				end
+				table.insert(tChunks, strCompile)
+				
+				for i, this_chunk in ipairs(tChunks) do
+					channelChecking:Send(this_chunk)
+				end
+			else
 			channelChecking:Send(strMessage)
+			end
 			
 			if strEmbeddedEmote then
 				local ComChan = Killroy:GetChannelByName("Command")
