@@ -97,7 +97,7 @@ local knDefaultFalloff = 5
 local ksDefaultEmoteColor = 'ffff9900'
 local ksDefaultSayColor = 'ffffffff'
 local ksDefaultOOCColor = 'ff7fffb9'
-local knDefaultICBlend = 1.0
+local knDefaultICBlend = 0.5
 local knDefaultEmoteBlend = 1.0
 local knDefaultOOCBlend = 1.0
 
@@ -129,7 +129,7 @@ function Killroy:new(o)
 			nEmoteBlend = knDefaultEmoteBlend,
 			nOOCBlend = knDefaultOOCBlend,
 			bLegacy = true,
-			sVersion = "1-4-4"
+			sVersion = "1-4-5"
 		}
 		self.tColorBuffer = 
 		{
@@ -319,7 +319,7 @@ function Killroy:OnRestore(eLevel, tData)
 		end
 	end
 	
-	self.tPrefs['sVersion'] = "1-4-4"
+	self.tPrefs['sVersion'] = "1-4-5"
 end
 
 ----------------------------
@@ -338,8 +338,8 @@ function Killroy:SetupRPChannels()
 	local channels = ChatSystemLib.GetChannels()
 	for i, this_chan in ipairs(channels) do
 		local bRPChanDefault = (this_chan:GetType() == ChatSystemLib.ChatChannel_Say) or 
-							   (this_chan:GetType() == ChatSystemLib.ChatChannel_Emote) or 
-							   (this_chan:GetType() == ChatSystemLib.ChatChannel_Guild)
+							   (this_chan:GetType() == ChatSystemLib.ChatChannel_Emote) --or 
+							   --(this_chan:GetType() == ChatSystemLib.ChatChannel_Guild)
 		if bRPChanDefault then
 			self:SetRPChannel(this_chan, true)
 		else
@@ -407,6 +407,15 @@ function Killroy:KillroyAbout()
 	SystemChannel:Post(string.format("Killroy Version: %s", self.tPrefs["sVersion"]))
 end
 
+function Killroy:GetChannelNames()
+	arChannels = ChatSystemLib.GetChannels()
+	arChannelNames = {}
+	for index, this_channel in pairs(arChannels) do
+		table.insert(arChannelNames, this_channel:GetName())
+	end
+	return arChannelNames
+end
+
 function Killroy:Command(...)
 	-- to become "kl" will allow you to control features of Killroy from the command line
 	
@@ -427,11 +436,9 @@ function Killroy:Command(...)
 	function RPOnOff(sArgs, bSetting)
 		--parse out arguments to channel names
 		arChannels = ChatSystemLib.GetChannels()
-		arChannelNames = {}
-		for index, this_channel in pairs(arChannels) do
-			table.insert(arChannelNames, this_channel:GetName())
-		end
+		arChannelNames = self:GetChannelNames()
 		for i,this_arg in ipairs(ArgToTable(sArgs)) do
+			Print(this_arg)
 			--check against channel names
 			for i,this_channel in pairs(arChannelNames) do
 				pattern = ".*"..this_arg..".*"
@@ -456,13 +463,74 @@ function Killroy:Command(...)
 						self:SetRPChannel(this_chan, bSetting)
 					end
 				end
+			elseif this_arg == "all" then
+				for i, this_chan in ipairs(arChannels) do
+					self:SetRPChannel(this_chan, bSetting)
+				end
 			else
 				--throw usage message
 			end
 		end
 	end
 	
-	System = self:GetChannelByName("System")
+	function GetColor(sArgs)
+		ChatLog = Apollo.GetAddon("ChatLog")
+		if not ChatLog then return nil end
+		
+		tArgs = ArgToTable(sArgs)
+		arChannels = ChatSystemLib.GetChannels()
+		arChannelNames = self:GetChannelNames()
+		
+		for i, this_arg in ipairs(tArgs) do
+			for j, this_name in pairs(arChannelNames) do
+				pattern = ".*"..this_arg..".*"
+				mymatch = string.match(this_name, pattern)
+				if mymatch then
+					this_chan = self:GetChannelByName(this_name)
+					nChannel = self:ChannelCludge(this_name, this_chan:GetType())
+					Print(tostring(nChannel))
+					this_color = ChatLog.arChatColor[nChannel]
+					this_color = self:toHex(this_color)
+					chanSystem:Post(string.format("Killroy: Channel: %s, Color: \"%s\"", this_name, this_color))
+				end
+			end
+		end
+	end
+	
+	function SetColor(sArgs)
+		ChatLog = Apollo.GetAddon("ChatLog")
+		if not ChatLog then return nil end
+		
+		tArgs = ArgToTable(sArgs)
+		arChannels = ChatSystemLib.GetChannels()
+		arChannelNames = self:GetChannelNames()
+		chanSystem = self:GetChannelByName("System")
+		
+		this_color = ApolloColor.new(tArgs[1])
+		if this_color then
+			for i, this_arg in ipairs(tArgs) do
+				for j, this_name in pairs(arChannelNames) do
+					pattern = ".*"..this_arg..".*"
+					mymatch = string.match(this_name, pattern)
+					if mymatch then
+						this_chan = self:GetChannelByName(this_name)
+						nChannel = self:ChannelCludge(this_name, this_chan:GetType())
+						ChatLog.arChatColor[nChannel] = this_color
+						chanSystem:Post(string.format("Killroy: Channel: %s set to Color: \"%s\"", this_name, tArgs[1]))
+					end
+				end
+			end
+		else
+			chatSystem:Post(string.format("Killroy: Color: %s is invalid.", tArgs[1]))
+		end
+	end
+	
+	function UsageError()
+		chanSystem = self:GetChannelByName("System")
+		chanSystem:Post("Killroy: Usage /kl [flag: -defaults, getclr, setclr, rpon, rpoff, rplist] <channel_name>...") 
+	end
+	
+	chanSystem = self:GetChannelByName("System")
 	
 	if arg[2] then
 		sRaw = arg[2]
@@ -471,13 +539,42 @@ function Killroy:Command(...)
 		--Print(tostring(sFlag).."|"..tostring(sArgs))
 		if sFlag then
 			if sArgs then
+				--defaults
+				if sFlag == "-defaults" then
+					self.tPrefs = 
+									{
+										bCrossFaction = true,
+										bRPOnly = true,
+										bFormatChat = true,
+										bRangeFilter = true,
+										bCustomChatColors = true,
+										nSayRange = knDefaultSayRange,
+										nEmoteRange = knDefaultEmoteRange,
+										nFalloff = knDefaultFalloff,
+										bUseOcclusion = true,
+										kstrEmoteColor = ksDefaultEmoteColor,
+										kstrSayColor = ksDefaultSayColor,
+										kstrOOCColor 	= ksDefaultOOCColor,
+										nICBlend = knDefaultICBlend,
+										nEmoteBlend = knDefaultEmoteBlend,
+										nOOCBlend = knDefaultOOCBlend,
+										bLegacy = true,
+										sVersion = "1-4-5"
+									}
+					chanCommand = self:GetChannelByName("Command")
+					self:SetupRPChannels()
+					chanCommand:Send("/reloadui")
+			
 				--getcolor, gets channel colors of channels sent to it
+				elseif sFlag == "-getclr" then
+					GetColor(sArgs)
 				--setcolor, set channel colors of channels sent to it
+				elseif sFlag == "-setclr" then
+					SetColor(sArgs)
 				--rp, toggles channels fed as arguments
-				if sFlag == "-rpon" then
+				elseif sFlag == "-rpon" then
 					RPOnOff(sArgs,true)
-				elseif
-					sFlag == "-rpoff" then
+				elseif sFlag == "-rpoff" then
 					RPOnOff(sArgs,false)
 				-- test command
 				elseif sFlag == "-test" then
@@ -486,17 +583,17 @@ function Killroy:Command(...)
 				elseif sFlag == "-rplist" then
 					tChannelList = self:GetRPChannelNames()
 					for index, this_name in ipairs(tChannelList) do
-						System:Post(string.format("Killroy: RP Channel, %s",this_name))
+						chanSystem:Post(string.format("Killroy: RP Channel, %s",this_name))
 					end
 				else
-					--throw usage message
+					UsageError()
 				end
 			end
 		else
-			--throw usage error
+			UsageError()
 		end
 	else
-		--throw usage error
+		UsageError()
 	end
 end
 
@@ -881,12 +978,17 @@ function Killroy:ChannelCludge(sName,nType)
 end
 
 function Killroy:Quantize(nFloat)
+	function round(num, idp)
+	  local mult = 10^(idp or 0)
+	  return math.floor(num * mult + 0.5) / mult
+	end
+
 	if nFloat < 0 then 
 		return 0
 	elseif nFloat > 1 then 
 		return 255
 	else 
-		return math.ceil(255*nFloat)
+		return round(255*nFloat)
 	end
 end
 
