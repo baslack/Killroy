@@ -129,7 +129,7 @@ function Killroy:new(o)
 			nEmoteBlend = knDefaultEmoteBlend,
 			nOOCBlend = knDefaultOOCBlend,
 			bLegacy = true,
-			sVersion = "1-4-5"
+			sVersion = "1-4-6"
 		}
 		self.tColorBuffer = 
 		{
@@ -319,7 +319,7 @@ function Killroy:OnRestore(eLevel, tData)
 		end
 	end
 	
-	self.tPrefs['sVersion'] = "1-4-5"
+	self.tPrefs['sVersion'] = "1-4-6"
 end
 
 ----------------------------
@@ -351,7 +351,11 @@ function Killroy:SetupRPChannels()
 end
 
 function Killroy:SetRPChannel(chan, bFlag)
-	nType = self:ChannelCludge(chan:GetName(), chan:GetType())
+	if self.tPrefs['bCustomChatColors'] then
+		nType = self:ChannelCludge(chan:GetName(), chan:GetType())
+	else
+		nType = chan:GetType()
+	end
 	self.arRPChannels[nType] = bFlag
 	return nil	
 end
@@ -387,7 +391,12 @@ end
 function Killroy:GetChannelByNumber(nType)
 	bNotFound = true
 	for i, this_chan in ipairs(ChatSystemLib.GetChannels()) do
-		if nType == self:ChannelCludge(this_chan:GetName(), this_chan:GetType()) then
+		if self.tPrefs['bCustomChatColors'] then
+			nChannel = self:ChannelCludge(this_chan:GetName(), this_chan:GetType())
+		else
+			nChannel = this_chan:GetType()
+		end
+		if nType == nChannel then
 			return this_chan
 		end
 	end
@@ -438,7 +447,7 @@ function Killroy:Command(...)
 		arChannels = ChatSystemLib.GetChannels()
 		arChannelNames = self:GetChannelNames()
 		for i,this_arg in ipairs(ArgToTable(sArgs)) do
-			Print(this_arg)
+			--/zonePrint(this_arg)
 			--check against channel names
 			for i,this_channel in pairs(arChannelNames) do
 				pattern = ".*"..this_arg..".*"
@@ -559,7 +568,7 @@ function Killroy:Command(...)
 										nEmoteBlend = knDefaultEmoteBlend,
 										nOOCBlend = knDefaultOOCBlend,
 										bLegacy = true,
-										sVersion = "1-4-5"
+										sVersion = "1-4-6"
 									}
 					chanCommand = self:GetChannelByName("Command")
 					self:SetupRPChannels()
@@ -1038,7 +1047,11 @@ function Killroy:Change_OnSettings()
 		end
 		
 		for idx, this_channel in ipairs(ChatSystemLib.GetChannels()) do
-			nCludge = Killroy:ChannelCludge(this_channel:GetName(), this_channel:GetType())
+			if Killroy.tPrefs['bCustomChatColors'] then
+				nCludge = Killroy:ChannelCludge(this_channel:GetName(), this_channel:GetType())
+			else
+				nCludge = this_channel:GetType()
+			end
 			Killroy.arChatColor[nCludge] = Killroy:toHex(self.arChatColor[nCludge]:ToTable())
 		end
 			
@@ -2128,6 +2141,8 @@ function Killroy:OnOK()
 	self.tPrefs['nOOCBlend'] = self.tBlendBuffer['nOOCBlend']
 	-- reloadui if custom chat disabled
 	if self.bReloadUIRequired then
+		self.arRPChannels = {}
+		self:SetupRPChannels()
 		self.bReloadUIRequired = false
 		local ComChan = self:GetChannelByName("Command")
 		ComChan:Send("/reloadui")
