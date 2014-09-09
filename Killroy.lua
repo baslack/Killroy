@@ -2,6 +2,16 @@
 -- Client Lua Script for Killroy
 -- Open Source Licensing granted by Benjamin A. Slack, feel free to use, change or extend.
 -----------------------------------------------------------------------------------------------
+
+--[[
+1-5 Notes
+
+1. RP Filter to a channel specific feature
+2. Save all ChatLog Preferences including window positions
+3. Parse Character Names for a first and last name.
+4. Custom Fonts
+
+]]--
  
 require "Apollo"
 require "Window"
@@ -129,7 +139,7 @@ function Killroy:new(o)
 			nEmoteBlend = knDefaultEmoteBlend,
 			nOOCBlend = knDefaultOOCBlend,
 			bLegacy = true,
-			sVersion = "1-4-6"
+			sVersion = "1-5-0"
 		}
 		self.tColorBuffer = 
 		{
@@ -149,6 +159,8 @@ function Killroy:new(o)
 		}
 		self.arChatColor = {}
 		self.arRPChannels = {}
+		self.arRPFilterChannels = {}
+		
 	else
 		self.tColorBuffer = 
 		{
@@ -240,6 +252,7 @@ function Killroy:OnDocumentLoaded()
 	if table.maxn(self.arRPChannels) == 0 then
 		self:SetupRPChannels()
 	end
+	
 end
 -----------------------------------------------------------------------------------------------
 -- Killroy Functions
@@ -319,7 +332,7 @@ function Killroy:OnRestore(eLevel, tData)
 		end
 	end
 	
-	self.tPrefs['sVersion'] = "1-4-6"
+	self.tPrefs['sVersion'] = "1-5-0"
 end
 
 ----------------------------
@@ -568,7 +581,7 @@ function Killroy:Command(...)
 										nEmoteBlend = knDefaultEmoteBlend,
 										nOOCBlend = knDefaultOOCBlend,
 										bLegacy = true,
-										sVersion = "1-4-6"
+										sVersion = "1-5-0"
 									}
 					chanCommand = self:GetChannelByName("Command")
 					self:SetupRPChannels()
@@ -969,18 +982,22 @@ function Killroy:ChannelCludge(sName,nType)
 	local knFudgeCircle = 50
 	local nCludge = 0
 	
-	if nType == ChatSystemLib.ChatChannel_Custom then
-		local chan = ChatSystemLib.GetChannels()
-		for idx, this_chan in ipairs(chan) do
-			if this_chan:GetName() == sName then nCludge = idx + knFudgeCustom end
+	if self.tPrefs[bCustomChatColors] then
+		if nType == ChatSystemLib.ChatChannel_Custom then
+			local chan = ChatSystemLib.GetChannels()
+			for idx, this_chan in ipairs(chan) do
+				if this_chan:GetName() == sName then nCludge = idx + knFudgeCustom end
+			end
+			return nCludge
+		elseif nType == ChatSystemLib.ChatChannel_Society then
+			local chan = ChatSystemLib.GetChannels()
+			for idx, this_chan in ipairs(chan) do
+				if this_chan:GetName() == sName then nCludge = idx + knFudgeCircle end
+			end
+			return nCludge
+		else
+			return nType
 		end
-		return nCludge
-	elseif nType == ChatSystemLib.ChatChannel_Society then
-		local chan = ChatSystemLib.GetChannels()
-		for idx, this_chan in ipairs(chan) do
-			if this_chan:GetName() == sName then nCludge = idx + knFudgeCircle end
-		end
-		return nCludge
 	else
 		return nType
 	end
