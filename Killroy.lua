@@ -214,6 +214,11 @@ function Killroy:OnDocumentLoaded()
 	
 	self.wndMain = Apollo.LoadForm(self.xmlDoc, "KillroyForm", nil, self)
 	self.wndMain:Show(false, true)
+	self.wndTest = Apollo.LoadForm(self.xmlDoc, "TestForm", nil, self)
+	self.wndTest:Show(true,true)
+	self.wndTest:FindChild("myComboBox"):AddItem("NoRP")
+	self.wndTest:FindChild("myComboBox"):AddItem("RPOnly")
+	self.wndTest:FindChild("myComboBox"):AddItem("ShowAll")
 
 	--register commands and actions
 	Apollo.RegisterSlashCommand("killroy", "OnKillroyOn", self)
@@ -982,7 +987,7 @@ function Killroy:ChannelCludge(sName,nType)
 	local knFudgeCircle = 50
 	local nCludge = 0
 	
-	if self.tPrefs[bCustomChatColors] then
+	if self.tPrefs["bCustomChatColors"] then
 		if nType == ChatSystemLib.ChatChannel_Custom then
 			local chan = ChatSystemLib.GetChannels()
 			for idx, this_chan in ipairs(chan) do
@@ -1639,6 +1644,12 @@ function Killroy:Change_AddChannelTypeToList()
 		else
 			RPChanBtn:SetCheck(false)
 		end
+		
+		-- set the RP filter options
+		local RPFilterCombo = wndChannelItem:FindChild("enumRPFilter")
+		RPFilterCombo:AddItem("NoRP")
+		RPFilterCombo:AddItem("RPOnly")
+		RPFilterCombo:AddItem("ShowAll")
 	end
 end
 
