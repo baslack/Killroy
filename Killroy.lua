@@ -6,7 +6,7 @@
 --[[
 1-5 Notes
 
-1. RP Filter to a channel specific feature
+*1. RP Filter to a channel specific feature
 2. Save all ChatLog Preferences including window positions
 3. Parse Character Names for a first and last name.
 4. Custom Fonts
@@ -111,6 +111,10 @@ local knDefaultICBlend = 0.5
 local knDefaultEmoteBlend = 1.0
 local knDefaultOOCBlend = 1.0
 
+local enum_NoRP = 1
+local enum_RPOnly = 2
+local enum_ShowAll = 3
+
 -----------------------------------------------------------------------------------------------
 -- Initialization
 -----------------------------------------------------------------------------------------------
@@ -125,6 +129,7 @@ function Killroy:new(o)
 		{
 			bCrossFaction = true,
 			bRPOnly = true,
+			bShowAll = false,
 			bFormatChat = true,
 			bRangeFilter = true,
 			bCustomChatColors = true,
@@ -214,11 +219,8 @@ function Killroy:OnDocumentLoaded()
 	
 	self.wndMain = Apollo.LoadForm(self.xmlDoc, "KillroyForm", nil, self)
 	self.wndMain:Show(false, true)
-	self.wndTest = Apollo.LoadForm(self.xmlDoc, "TestForm", nil, self)
-	self.wndTest:Show(true,true)
-	self.wndTest:FindChild("myComboBox"):AddItem("NoRP")
-	self.wndTest:FindChild("myComboBox"):AddItem("RPOnly")
-	self.wndTest:FindChild("myComboBox"):AddItem("ShowAll")
+	--self.wndTest = Apollo.LoadForm(self.xmlDoc, "RPFilter", nil, self)
+	--self.wndTest:Show(true,true)
 
 	--register commands and actions
 	Apollo.RegisterSlashCommand("killroy", "OnKillroyOn", self)
@@ -242,6 +244,7 @@ function Killroy:OnDocumentLoaded()
 		self:Change_AddChannelTypeToList()
 		self:Append_OnChannelColorBtn()
 		self:Append_OnRPChannel()
+		self:Append_OnRPFilterChanged()
 		self:Change_OnViewCheck()
 		self:Change_NewChatWindow()
 		self:Change_OnInputChanged()
@@ -278,6 +281,7 @@ function Killroy:OnConfigure()
 	self.wndMain:FindChild('sVersion'):SetText(self.tPrefs['sVersion'])
 	self.wndMain:FindChild('bCrossFaction'):SetCheck(self.tPrefs['bCrossFaction'])
 	self.wndMain:FindChild('bRPOnly'):SetCheck(self.tPrefs['bRPOnly'])
+	self.wndMain:FindChild('bShowAll'):SetCheck(self.tPrefs['bShowAll'])
 	self.wndMain:FindChild('bFormatChat'):SetCheck(self.tPrefs['bFormatChat'])
 	self.wndMain:FindChild('bRangeFilter'):SetCheck(self.tPrefs['bRangeFilter'])
 	self.wndMain:FindChild('bUseOcclusion'):SetCheck(self.tPrefs['bUseOcclusion'])
@@ -312,7 +316,8 @@ function Killroy:OnSave(eLevel)
 	elseif (eLevel == GameLib.CodeEnumAddonSaveLevel.Character) then
 		return {
 				arChatColor = self.arChatColor,
-				arRPChannels = self.arRPChannels
+				arRPChannels = self.arRPChannels,
+				arRPFilterChannels = self.arRPFilterChannels
 				}
 	else
 		return nil
@@ -334,6 +339,11 @@ function Killroy:OnRestore(eLevel, tData)
 	if (tData.arRPChannels ~= nil) then
 		for i,v in pairs(tData.arRPChannels) do
 			self.arRPChannels[i] = v
+		end
+	end
+	if (tData.arRPFilterChannels ~= nil) then
+		for i,v in pairs(tData.arRPFilterChannels) do
+			self.arRPFilterChannels[i] = v
 		end
 	end
 	
@@ -953,18 +963,6 @@ function Killroy:RangeFilter(sMessage, sSender, eChannelType)
 	end
 end
 
-function Killroy:RestoreMountSetting()
-	if self.tPrefs["nSelectedMount"] then
-		ActionBarFrame = Apollo.GetAddon("ActionBarFrame")
-		if not(ActionBarFrame) then return nil end
-		
-		if self.tPrefs["nSelectedMount"] then
-			ActionBarFrame.nSelectedMount = self.tPrefs["nSelectedMount"]
-			ActionBarFrame:RedrawSelectedMounts()
-		end 
-	end
-end
-
 function Killroy:Restore_arChatColor()
 	ChatLog = Apollo.GetAddon("ChatLog")
 	if not ChatLog then 
@@ -1034,6 +1032,30 @@ end
 --------------------------------------------------------
 -- Killroy Change Methods, these replace ChatLog methods
 --------------------------------------------------------
+
+function CaptureChatLogSettings()
+--[[
+wndChatOptions
+--
+FontSizeSmall
+FontSizeMedium
+FontSizeLarge
+RoleplayViewToggle_1
+RoleplayViewToggle_2
+RoleplayViewToggle_3
+ProfanityOn
+ProfanityOff
+TimestampShow
+TimestampShowOff
+ChannelShow
+ChannelShowOff
+EnableFadeBtn
+DisableFadeBtn
+SaveToLogOn
+SaveToLogOff
+BGOpacity
+]]--
+end
 
 function Killroy:Change_OnSettings()
 	ChatLog = Apollo.GetAddon("ChatLog")
@@ -1645,28 +1667,26 @@ function Killroy:Change_AddChannelTypeToList()
 			RPChanBtn:SetCheck(false)
 		end
 		
-		-- set the RP filter options
-		local RPFilterCombo = wndChannelItem:FindChild("enumRPFilter")
-		RPFilterCombo:AddItem("NoRP")
-		RPFilterCombo:AddItem("RPOnly")
-		RPFilterCombo:AddItem("ShowAll")
-	end
-end
-
-function Killroy:Change_ActionBarFrame_OnMountBtn()
-
-	ActionBarFrame = Apollo.GetAddon("ActionBarFrame")
-	if not(ActionBarFrame) then return nil end
-	
-	function ActionBarFrame:OnMountBtn(wndHandler, wndControl)
-		Killroy = Apollo.GetAddon("Killroy")
-		if not(Killroy) then return nil end
+		-- populate the settings of the RP Filter buttons
+		local enum_NoRP = 1
+		local enum_RPOnly = 2
+		local enum_ShowAll = 3
 		
-		self.nSelectedMount = wndControl:GetData():GetId()
-		Killroy.tPrefs["nSelectedMount"] = self.nSelectedMount
-	
-		self.wndMountFlyout:FindChild("MountPopoutFrame"):Show(false)
-		self:RedrawSelectedMounts()
+		local NoRPBtn = wndChannelItem:FindChild("bNoRP")
+		local RPOnlyBtn = wndChannelItem:FindChild("bRPOnly")
+		local ShowAllBtn = wndChannelItem:FindChild("bAll")
+		
+		if Killroy.arRPFilterChannels[nCludge] then
+			if Killroy.arRPFilterChannels[nCludge] == enum_NoRP then
+				NoRPBtn:SetCheck(true)
+			elseif Killroy.arRPFilterChannels[nCludge] == enum_RPOnly then
+				RPOnlyBtn:SetCheck(true)
+			else
+				ShowAllBtn:SetCheck(true)
+			end
+		else
+			ShowAllBtn:SetCheck(true)
+		end
 	end
 end
 
@@ -1792,6 +1812,10 @@ function Killroy:Change_HelperGenerateChatMessage()
 		Killroy = Apollo.GetAddon("Killroy")
 		if not Killroy then return nil end
 		
+		local enum_NoRP = 1
+		local enum_RPOnly = 2
+		local enum_ShowAll = 3
+		
 		if tQueuedMessage.xml then
 			return
 		end
@@ -1876,6 +1900,20 @@ function Killroy:Change_HelperGenerateChatMessage()
 			Sound.Play(Sound.PlayUISocialWhisper)
 		end
 
+		-- inserting an abort of the chat line for the filter
+		
+		local bRolePlay = false
+		for idx, tSegment in ipairs( tMessage.arMessageSegments ) do
+			if tSegment.bRolePlay then
+				bRolePlay = true
+			end
+		end
+		
+		if Killroy.arRPFilterChannels[eChannelType] then
+			if Killroy.arRPFilterChannels[eChannelType] == enum_NoRP and bRolePlay then return end
+			if Killroy.arRPFilterChannels[eChannelType] == enum_RPOnly and not bRolePlay then return end
+		end
+	
 		-- We build strings backwards, right to left
 		if eChannelType == ChatSystemLib.ChatChannel_AnimatedEmote then -- emote animated channel gets special formatting
 			-- bs:051414, incorporating preferences variables
@@ -1947,6 +1985,8 @@ function Killroy:Change_HelperGenerateChatMessage()
 			local bAlien = tSegment.bAlien or (tMessage.bCrossFaction and not(Killroy.tPrefs['bCrossFaction']))
 			local bShow = false
 
+			--[[
+			-- original filter code
 			if self.eRoleplayOption == 3 then
 				bShow = not tSegment.bRolePlay
 			elseif self.eRoleplayOption == 2 then
@@ -1954,6 +1994,27 @@ function Killroy:Change_HelperGenerateChatMessage()
 			else
 				bShow = true;
 			end
+			]]--
+			
+			
+			--bs:091114 Killroy per channel filter
+			
+			if Killroy.arRPFilterChannels[eChannelType] then
+				Print(string.format("A: %s", tostring(bShow)))
+				if Killroy.arRPFilterChannels[eChannelType] == enum_NoRP then
+					bShow = not tSegment.bRolePlay
+					Print(string.format("B: %s", tostring(bShow)))
+				elseif Killroy.arRPFilterChannels[eChannelType] == enum_RPOnly then
+					bShow = tSegment.bRolePlay
+					Print(string.format("C: %s", tostring(bShow)))
+				else
+					-- assumes enum_ShowAll
+					bShow = true
+				end
+			else
+				bShow = true
+			end
+			-- end Killroy per channel filter code
 
 			if bShow then
 				local crChatText = crText;
@@ -2055,6 +2116,10 @@ function Killroy:Change_OnChatInputReturn()
 		local Killroy = Apollo.GetAddon("Killroy")
 		if not Killroy then return nil end
 		
+		local enum_NoRP = 1
+		local enum_RPOnly = 2
+		local enum_ShowAll = 3
+		
 		if wndControl:GetName() == "Input" then
 			local wndForm = wndControl:GetParent()
 			strText = self:HelperReplaceLinks(strText, wndControl:GetAllLinks())
@@ -2062,21 +2127,33 @@ function Killroy:Change_OnChatInputReturn()
 			local wndInput = wndForm:FindChild("Input")
 
 			wndControl:SetText("")
+			--[[
+			-- bs:091114, old Killroy marker code
 			-- bs:051414, incorporating preferences
 			if not(Killroy.tPrefs['bRPOnly']) then
 				if self.eRoleplayOption == 2 then
 					wndControl:SetText(Apollo.GetString("ChatLog_RPMarker"))
 				end
 			end
-
-
+			]]--
+			
 			local tChatData = wndForm:GetData()
 			local bViewedChannel = true
 			local tInput = ChatSystemLib.SplitInput(strText)
 			if strText ~= "" and strText ~= Apollo.GetString("ChatLog_RPMarker") and strText ~= Apollo.GetString("ChatLog_Marker") then
 
 				local channelCurrent = tInput.channelCommand or tChatData.channelCurrent
-
+				
+				-- bs:091114, new Killroy marker code
+				local nCludge = Killroy:ChannelCludge(channelCurrent:GetName(), channelCurrent:GetType())
+				if not(Killroy.tPrefs["bRPOnly"]) then
+					if Killroy.arRPFilterChannels[nCludge] then
+						if Killroy.arRPFilterChannels[nCludge] == enum_RPOnly then
+							wndControl:SetText(Apollo.GetString("ChatLog_RPMarker"))
+						end
+					end
+				end
+	
 				if channelCurrent:GetType() == ChatSystemLib.ChatChannel_Command then
 					if tInput.bValidCommand then -- good command
 						ChatSystemLib.Command( strText )
@@ -2091,9 +2168,26 @@ function Killroy:Change_OnChatInputReturn()
 					end
 				else
 					tChatData.channelCurrent = channelCurrent
+					--[[
+					-- bs:091114, old Killroy filter code
 					if self.eRoleplayOption == 2 and Killroy.tPrefs['bRPOnly'] then
 						tInput.strMessage = Apollo.GetString("ChatLog_RPMarker") .. tInput.strMessage
 					end
+					]]--
+					
+					-- bs: 091114, new Killroy filter code
+					if Killroy.arRPFilterChannels[nCludge] then
+						if Killroy.arRPFilterChannels[nCludge] == enum_RPOnly and Killroy.tPrefs["bRPOnly"] then
+							tInput.strMessage = Apollo.GetString("ChatLog_RPMarker") .. tInput.strMessage
+						elseif Killroy.arRPFilterChannels[nCludge] == enum_ShowAll and Killroy.tPrefs["bShowAll"] then
+							tInput.strMessage = Apollo.GetString("ChatLog_RPMarker") .. tInput.strMessage
+						end
+					else
+						if Killroy.tPrefs["bShowAll"] then
+							tInput.strMessage = Apollo.GetString("ChatLog_RPMarker") .. tInput.strMessage
+						end
+					end
+
 					bViewedChannel = self:VerifyChannelVisibility(channelCurrent, tInput, wndForm)
 				end
 			end
@@ -2153,6 +2247,7 @@ function Killroy:OnOK()
 	self.wndMain:Close() -- hide the window
 	self.tPrefs['bCrossFaction'] = (self.wndMain:FindChild('bCrossFaction'):IsChecked())
 	self.tPrefs['bRPOnly'] = (self.wndMain:FindChild('bRPOnly'):IsChecked())
+	self.tPrefs['bShowAll'] = (self.wndMain:FindChild('bShowAll'):IsChecked())
 	self.tPrefs['bFormatChat'] = (self.wndMain:FindChild('bFormatChat'):IsChecked())
 	self.tPrefs['bRangeFilter'] = (self.wndMain:FindChild('bRangeFilter'):IsChecked())
 	self.tPrefs['bUseOcclusion'] = (self.wndMain:FindChild('bUseOcclusion'):IsChecked())
@@ -2182,6 +2277,7 @@ function Killroy:OnCancel()
 	self.wndMain:Close() -- hide the window
 	self.wndMain:FindChild('bCrossFaction'):SetCheck(self.tPrefs['bCrossFaction'])
 	self.wndMain:FindChild('bRPOnly'):SetCheck(self.tPrefs['bRPOnly'])
+	self.wndMain:FindChild('bShowAll'):SetCheck(self.tPrefs['bShowAll'])
 	self.wndMain:FindChild('bFormatChat'):SetCheck(self.tPrefs['bFormat'])
 	self.wndMain:FindChild('bRangeFilter'):SetCheck(self.tPrefs['bRangeFilter'])
 	self.wndMain:FindChild('bUseOcclusion'):SetCheck(self.tPrefs['bUseOcclusion'])
@@ -2287,6 +2383,32 @@ function Killroy:Append_OnRPChannel()
 		RPChannel = Killroy:GetChannelByNumber(nChannel)
 		Killroy:SetRPChannel(RPChannel, wndControl:IsChecked())
 		-- Print("OnRPChannel: %s, RPChannel: %s", wndChatType:GetName(), RPChannel:GetName())
+	end
+end
+
+function Killroy:Append_OnRPFilterChanged()
+	ChatLog = Apollo.GetAddon("ChatLog")
+	if not ChatLog then return nil end
+	Apollo.RegisterEventHandler("OnRPFilterChanged", OnRPFilterChanged, ChatLog)
+	
+	function ChatLog:OnRPFilterChanged( wndHandler, wndControl, eMouseButton )
+		Killroy = Apollo.GetAddon("Killroy")
+		if not Killroy then return nil end
+		
+		wndChatType = wndControl:GetParent()
+		nChannel = wndChatType:GetData()
+		
+		local enum_NoRP = 1
+		local enum_RPOnly = 2
+		local enum_ShowAll = 3
+		
+		if wndControl:IsChecked() and (wndControl:GetName() == "bNoRP") then
+			Killroy.arRPFilterChannels[nChannel] = enum_NoRP
+		elseif wndControl:IsChecked() and (wndControl:GetName() == "bRPOnly") then
+			Killroy.arRPFilterChannels[nChannel] = enum_RPOnly
+		else
+			Killroy.arRPFilterChannels[nChannel] = nil
+		end
 	end
 end
 
