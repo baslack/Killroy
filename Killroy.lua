@@ -239,22 +239,23 @@ function Killroy:OnDocumentLoaded()
 	self:Change_OnRoleplayBtn()
 	self:Change_OnChatMessage()
 	self:Change_VerifyChannelVisibility()
-
-	if self.tPrefs["bCustomChatColors"] then
-		self:Change_AddChannelTypeToList()
-		self:Append_OnChannelColorBtn()
-		self:Append_OnRPChannel()
-		self:Append_OnRPFilterChanged()
-		self:Change_OnViewCheck()
-		self:Change_NewChatWindow()
-		self:Change_OnInputChanged()
-		self:Change_OnInputMenuEntry()
-		self:Change_BuildInputTypeMenu()
-		self:Change_HelperRemoveChannelFromInputWindow()
-		self:Change_HelperFindAViewedChannel()
-		self:Change_OnSettings()
-		self.arChatColorTimer = ApolloTimer.Create(2, true, "arChatColor_Check", self)
-	end
+	
+	-- Custom Chat Colors Code, no longer optional
+	self:Change_AddChannelTypeToList()
+	self:Append_OnChannelColorBtn()
+	self:Append_OnRPChannel()
+	self:Append_OnRPFilterChanged()
+	self:Change_OnViewCheck()
+	self:Change_NewChatWindow()
+	self:Change_OnInputChanged()
+	self:Change_OnInputMenuEntry()
+	self:Change_BuildInputTypeMenu()
+	self:Change_HelperRemoveChannelFromInputWindow()
+	self:Change_HelperFindAViewedChannel()
+	self:Change_OnSettings()
+	self.arChatColorTimer = ApolloTimer.Create(2, true, "arChatColor_Check", self)
+	self.ChatLogOptionsTimer = ApolloTimer.Create(2, true, "ChatLogOptions_Check", self)
+	
 	
 	--RPChannelSetup
 	if table.maxn(self.arRPChannels) == 0 then
@@ -277,6 +278,31 @@ function Killroy:arChatColor_Check()
 	end
 end
 
+function Killroy:ChatLogOptions_Check()
+	ChatLog = Apollo.GetAddon("ChatLog")
+	if not ChatLog then return nil end
+	
+	if ChatLog.wndChatOptions then
+		ChatLog.wndChatOptions = Apollo.LoadForm(self.xmlDoc, "ChatOptionsForm", nil, ChatLog)
+		ChatLog.wndChatOptions:Show(true)
+		arFontNames = {"CRB_Interface", "CRB_Header"}
+		arFontSizes = {"7", "9", "10", "11", "12", "14", "16"}
+		fontname_control = ChatLog.wndChatOptions:FindChild("strFontName")
+		fontsize_control = ChatLog.wndChatOptions:FindChild("strFontSize")
+		if fontname_control then
+			for i, this_name in pairs(arFontNames) do
+				fontname_control:AddItem(this_name)
+			end
+		end
+		if fontsize_control then
+			for i, this_size in pairs(arFontSizes) do
+				fontsize_control:AddItem(this_size)
+			end
+		end
+		self.ChatLogOptionsTimer:Stop()
+	end
+end
+
 function Killroy:OnConfigure()
 	self.wndMain:FindChild('sVersion'):SetText(self.tPrefs['sVersion'])
 	self.wndMain:FindChild('bCrossFaction'):SetCheck(self.tPrefs['bCrossFaction'])
@@ -285,7 +311,7 @@ function Killroy:OnConfigure()
 	self.wndMain:FindChild('bFormatChat'):SetCheck(self.tPrefs['bFormatChat'])
 	self.wndMain:FindChild('bRangeFilter'):SetCheck(self.tPrefs['bRangeFilter'])
 	self.wndMain:FindChild('bUseOcclusion'):SetCheck(self.tPrefs['bUseOcclusion'])
-	self.wndMain:FindChild('bCustomChatColors'):SetCheck(self.tPrefs['bCustomChatColors'])
+	--self.wndMain:FindChild('bCustomChatColors'):SetCheck(self.tPrefs['bCustomChatColors'])
 	self.wndMain:FindChild('setEmoteColor'):SetBGColor(self.tPrefs['kstrEmoteColor'])
 	self.wndMain:FindChild('bLegacy'):SetCheck(self.tPrefs['bLegacy'])
 	self.wndMain:FindChild('nEmoteBlend'):SetValue(self.tPrefs['nEmoteBlend'])
@@ -348,6 +374,7 @@ function Killroy:OnRestore(eLevel, tData)
 	end
 	
 	self.tPrefs['sVersion'] = "1-5-0"
+	self.tPrefs['bCustomChatColors'] = true
 end
 
 ----------------------------
@@ -2251,7 +2278,7 @@ function Killroy:OnOK()
 	self.tPrefs['bFormatChat'] = (self.wndMain:FindChild('bFormatChat'):IsChecked())
 	self.tPrefs['bRangeFilter'] = (self.wndMain:FindChild('bRangeFilter'):IsChecked())
 	self.tPrefs['bUseOcclusion'] = (self.wndMain:FindChild('bUseOcclusion'):IsChecked())
-	self.tPrefs['bCustomChatColors'] = (self.wndMain:FindChild('bCustomChatColors'):IsChecked())
+	--self.tPrefs['bCustomChatColors'] = (self.wndMain:FindChild('bCustomChatColors'):IsChecked())
 	self.tPrefs['bLegacy'] = (self.wndMain:FindChild('bLegacy'):IsChecked())
 	self.tPrefs['kstrEmoteColor'] = self.tColorBuffer['kstrEmoteColor']
 	self.tPrefs['kstrSayColor'] = self.tColorBuffer['kstrSayColor']
@@ -2281,7 +2308,7 @@ function Killroy:OnCancel()
 	self.wndMain:FindChild('bFormatChat'):SetCheck(self.tPrefs['bFormat'])
 	self.wndMain:FindChild('bRangeFilter'):SetCheck(self.tPrefs['bRangeFilter'])
 	self.wndMain:FindChild('bUseOcclusion'):SetCheck(self.tPrefs['bUseOcclusion'])
-	self.wndMain:FindChild('bCustomChatColors'):SetCheck(self.tPrefs['bCustomChatColors'])
+	--self.wndMain:FindChild('bCustomChatColors'):SetCheck(self.tPrefs['bCustomChatColors'])
 	self.wndMain:FindChild('bLegacy'):SetCheck(self.tPrefs['bLegacy'])
 	self.tColorBuffer['kstrEmoteColor'] = self.tPrefs['kstrEmoteColor'] 
 	self.tColorBuffer['kstrSayColor'] = self.tPrefs['kstrSayColor']
