@@ -285,6 +285,8 @@ function Killroy:ChatLogOptions_Check()
 	if ChatLog.wndChatOptions then
 		ChatLog.wndChatOptions = Apollo.LoadForm(self.xmlDoc, "ChatOptionsForm", nil, ChatLog)
 		ChatLog.wndChatOptions:Show(true)
+		
+		--font selection setup
 		arFontNames = {"CRB_Interface", "CRB_Header"}
 		arFontSizes = {"7", "9", "10", "11", "12", "14", "16"}
 		fontname_control = ChatLog.wndChatOptions:FindChild("strFontName")
@@ -299,6 +301,40 @@ function Killroy:ChatLogOptions_Check()
 				fontsize_control:AddItem(this_size)
 			end
 		end
+		
+		--setting controls
+		if ChatLog.bEnableBGFade then
+			btnEnableBGFade = ChatLog.wndChatOptions:FindChild("EnableFadeBtn")
+			btnEnableBGFade:SetCheck(true)
+		end
+		
+		if ChatLog.bEnableNCFade then
+			btnEnableNCFade = ChatLog.wndChatOptions:FindChild("DisableFadeBtn")
+			btnEnableNCFade:SetCheck(true)
+		end
+		
+		if ChatLog.nBGOpacity then
+			sliderBGOpacity = ChatLog.wndChatOptions:FindChild("BGOpacity:BGOpacitySlider")
+			sliderBGOpacity:SetValue(ChatLog.nBGOpacity)
+		end
+		
+		bSaveToLog = Apollo.GetConsoleVariable("chat.saveLog")
+		ChatLog.wndChatOptions:FindChild("SaveToLogOn"):SetCheck(bSaveToLog)
+		ChatLog.wndChatOptions:FindChild("SaveToLogOff"):SetCheck(not(bSaveToLog))
+		
+		btnChannelShow = ChatLog.wndChatOptions:FindChild("ChannelShow")
+		btnChannelShowOff = ChatLog.wndChatOptions:FindChild("ChannelShowOff")
+		if ChatLog.bShowChannel then	
+			btnChannelShow:SetCheck(ChatLog.bShowChannel)
+			btnChannelShowOff:SetCheck(not(ChatLog.bShowChannel))
+		end
+		
+		ChatLog.wndChatOptions:FindChild("TimestampShow"):SetCheck(ChatLog.bShowTimestamp)
+		ChatLog.wndChatOptions:FindChild("TimestampShowOff"):SetCheck(not(ChatLog.bShowTimestamp))
+		
+		ChatLog.wndChatOptions:FindChild("ProfanityOn"):SetCheck(Apollo.GetConsoleVariable("chat.filter"))
+		ChatLog.wndChatOptions:FindChild("ProfanityOff"):SetCheck(not(Apollo.GetConsoleVariable("chat.filter")))
+
 		self.ChatLogOptionsTimer:Stop()
 	end
 end
