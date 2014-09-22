@@ -165,6 +165,7 @@ function Killroy:new(o)
 		self.arChatColor = {}
 		self.arRPChannels = {}
 		self.arRPFilterChannels = {}
+		self.tChatLogPrefs = {}
 		
 	else
 		self.tColorBuffer = 
@@ -255,6 +256,16 @@ function Killroy:OnDocumentLoaded()
 	self:Change_OnSettings()
 	self.arChatColorTimer = ApolloTimer.Create(2, true, "arChatColor_Check", self)
 	self.ChatLogOptionsTimer = ApolloTimer.Create(2, true, "ChatLogOptions_Check", self)
+	
+	-- ChatLog Options Event Handler Overrides
+	self:Change_OnProfanityFilter()
+	self:Change_OnTimestamp()
+	self:Change_OnChannelLabel()
+	self:Change_OnSaveToLog()
+	self:Change_OnBGFade()
+	self:Change_OnBGDrawSlider()
+	self:Append_OnFontChange()
+
 	
 	
 	--RPChannelSetup
@@ -374,7 +385,10 @@ end
 
 function Killroy:OnSave(eLevel)
 	if (eLevel == GameLib.CodeEnumAddonSaveLevel.Account) then
-		return {tPrefs = self.tPrefs,}
+		return {
+				tPrefs = self.tPrefs,
+				tChatLogPrefs = self.tChatLogPrefs
+				}
 	elseif (eLevel == GameLib.CodeEnumAddonSaveLevel.Character) then
 		return {
 				arChatColor = self.arChatColor,
@@ -411,6 +425,14 @@ function Killroy:OnRestore(eLevel, tData)
 	
 	self.tPrefs['sVersion'] = "1-5-0"
 	self.tPrefs['bCustomChatColors'] = true
+	
+	if (tData.tChatLogPrefs ~= nil) then
+		for i,v in pairs(tData.tChatLogPrefs) do
+			self.tChatLogPrefs[i] = v
+		end
+	end
+	
+	-- implement override of ChatLog Options from Killroy Save	
 end
 
 ----------------------------
@@ -1097,28 +1119,129 @@ end
 --------------------------------------------------------
 
 function CaptureChatLogSettings()
---[[
-wndChatOptions
---
-FontSizeSmall
-FontSizeMedium
-FontSizeLarge
-RoleplayViewToggle_1
-RoleplayViewToggle_2
-RoleplayViewToggle_3
-ProfanityOn
-ProfanityOff
-TimestampShow
-TimestampShowOff
-ChannelShow
-ChannelShowOff
-EnableFadeBtn
-DisableFadeBtn
-SaveToLogOn
-SaveToLogOff
-BGOpacity
-]]--
+
 end
+
+function Killroy:Change_OnProfanityFilter()
+
+	ChatLog = Apollo.GetAddon("ChatLog")
+	if not ChatLog then return nil end
+
+	function ChatLog:OnProfanityFilter(wndHandler, wndControl)
+		if wndHandler == wndControl then
+			--ChatLog.bProfanityFilter = wndControl:GetData()
+			--Print(wndControl:GetName())
+			--Print(tostring(wndControl:GetData()))
+			if string.find(wndControl:GetName(), ".*On.*") then
+				ChatLog.bProfanityFilter = true
+			else
+				ChatLog.bProfanityFilter = false
+			end
+			for idx, channelCurrent in ipairs(ChatSystemLib.GetChannels()) do
+				channelCurrent:SetProfanity(self.bProfanityFilter)
+			end
+			Apollo.SetConsoleVariable("chat.filter", ChatLog.bProfanityFilter)
+			--Print("Changed Pro Fan Fired.")
+			
+		end
+	end
+end
+
+function Killroy:Change_OnTimestamp()
+	ChatLog = Apollo.GetAddon("ChatLog")
+	if not ChatLog then return nil end
+	
+	function ChatLog:OnTimestamp(wndHandler, wndControl)
+		--self.bShowTimestamp = wndControl:GetData()
+		if string.find(wndControl:GetName(), ".*On.*") then
+			ChatLog.bShowTimestamp = true
+		else
+			ChatLog.bShowTimestamp = false
+		end
+	end
+end
+
+function Killroy:Change_OnChannelLabel()
+	ChatLog = Apollo.GetAddon("ChatLog")
+	if not ChatLog then return nil end
+	
+	function ChatLog:OnChannelLabel(wndHandler, wndControl)
+		--self.bShowChannel = wndControl:GetData()
+		if string.find(wndControl:GetName(), ".*Off.*") then
+			ChatLog.bShowChannel = false
+		else
+			ChatLog.bShowChannel = true
+		end
+	end
+end
+
+function Killroy:Change_OnSaveToLog()
+	ChatLog = Apollo.GetAddon("ChatLog")
+	if not ChatLog then return nil end
+	
+	function ChatLog:OnSaveToLog(wndHandler, wndControl)
+		--[[
+		if wndHandler == wndControl then
+			local bValue = wndHandler:GetName() == "SaveToLogOn"
+			Apollo.SetConsoleVariable("chat.saveLog", bValue)
+			self.wndChatOptions:FindChild("SaveToLogOn"):SetCheck(bValue)
+			self.wndChatOptions:FindChild("SaveToLogOff"):SetCheck(not bValue)
+		end
+		]]--
+		if string.find(wndControl:GetName(), ".*On.*") then 
+			ChatLog.bSaveToLog = true
+			Apollo.SetConsoleVariable("chat.saveLog", true)
+		else
+			ChatLog.bSaveToLog = false
+			Apollo.SetConsoleVariable("chat.saveLog", false)
+		end
+	end
+end
+
+function Killroy:Change_OnBGFade()
+	ChatLog = Apollo.GetAddon("ChatLog")
+	if not ChatLog then return nil end
+	
+	function ChatLog:OnBGFade(wndHandler, wndControl)
+		--[[
+		local wndParent = wndControl:GetParent()
+		self.bEnableBGFade = wndControl:GetData()
+		self.bEnableNCFade = wndControl:GetData()
+		]]--
+		
+		if string.find(wndControl:GetName(), ".*Enable.*") then
+			ChatLog.bEnableBGFade = true
+			ChatLog.bEnableNCFade = true
+		else
+			ChatLog.bEnableBGFade = false
+			ChatLog.bEnableNCFade = false
+		end
+	
+		for idx, wndChatWindow in pairs(self.tChatWindows) do
+			wndChatWindow:SetStyle("AutoFadeNC", ChatLog.bEnableNCFade)
+			if ChatLog.bEnableNCFade then wndChatWindow:SetNCOpacity(1) end
+	
+			wndChatWindow:SetStyle("AutoFadeBG", ChatLog.bEnableBGFade)
+			if ChatLog.bEnableBGFade then wndChatWindow:SetBGOpacity(1) end
+		end
+	end
+end
+
+function Killroy:Change_OnBGDrawSlider()
+	ChatLog = Apollo.GetAddon("ChatLog")
+	if not ChatLog then return nil end
+	
+	function ChatLog:OnBGDrawSlider(wndHandler, wndControl)
+		--self.nBGOpacity = self.wndChatOptions:FindChild("BGOpacity:BGOpacitySlider"):GetValue()
+		ChatLog.nBGOpacity = wndControl:GetValue()
+	
+		for idx, wndChatWindow in pairs(self.tChatWindows) do
+			wndChatWindow:FindChild("BGArt"):SetBGColor(CColor.new(1.0, 1.0, 1.0, ChatLog.nBGOpacity))
+			wndChatWindow:FindChild("BGArt_SidePanel"):SetBGColor(CColor.new(1.0, 1.0, 1.0, ChatLog.nBGOpacity))
+		end
+	end
+end
+
 
 function Killroy:Change_OnSettings()
 	ChatLog = Apollo.GetAddon("ChatLog")
@@ -2083,7 +2206,8 @@ function Killroy:Change_HelperGenerateChatMessage()
 				local crChatText = crText;
 				local crBubbleText = kstrColorChatRegular
 				local strChatFont = self.strFontOption
-				local strBubbleFont = kstrBubbleFont
+				--local strBubbleFont = kstrBubbleFont
+				local strBubbleFont = self.strFontOption
 				local tLink = {}
 
 
@@ -2118,7 +2242,8 @@ function Killroy:Change_HelperGenerateChatMessage()
 					if tSegment.bRolePlay then
 						crBubbleText = kstrColorChatRoleplay
 						strChatFont = self.strRPFontOption
-						strBubbleFont = kstrDialogFontRP
+						--strBubbleFont = kstrDialogFontRP
+						strBubbleFont = self.strRPFontOption
 					end
 
 					if bAlien or tSegment.bProfanity then -- Weak filter. Note only profanity is scrambled.
@@ -2473,6 +2598,45 @@ function Killroy:Append_OnRPFilterChanged()
 			Killroy.arRPFilterChannels[nChannel] = nil
 		end
 	end
+end
+
+function Killroy:Append_OnFontChange()
+	ChatLog = Apollo.GetAddon("ChatLog")
+	if not ChatLog then return nil end
+	Apollo.RegisterEventHandler("OnFontChange", OnFontChange, ChatLog)
+	
+	function ChatLog:OnFontChange( wndHandler, wndControl )
+		local fontface = ChatLog.wndChatOptions:FindChild("strFontName")
+		local fontsize = ChatLog.wndChatOptions:FindChild("strFontSize")
+		
+		if not(fontface:GetSelectedText()) then 
+			strFontName = fontface:GetText()
+		else
+			strFontName = fontface:GetSelectedText()
+		end
+		
+		if not(fontsize:GetSelectedText()) then
+			strFontSize = fontsize:GetText()
+		else
+			strFontSize = fontsize:GetSelectedText()
+		end
+		
+		local font = strFontName .. strFontSize
+		fontface:SetFont(font)
+		fontsize:SetFont(font)
+		
+		Print(font)
+		
+		ChatLog.strFontOption = font
+		ChatLog.strRPFontOption = font .. "_I"
+	end	
+end
+
+---------------------------------------------------------------------------------------------------
+-- ChatOptionsForm Functions
+---------------------------------------------------------------------------------------------------
+
+function Killroy:OnFontChange( wndHandler, wndControl )
 end
 
 -----------------------------------------------------------------------------------------------
