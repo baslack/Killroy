@@ -298,21 +298,50 @@ function Killroy:ChatLogOptions_Check()
 		ChatLog.wndChatOptions:Show(true)
 		
 		--font selection setup
-		arFontNames = {"CRB_Interface", "CRB_Header"}
-		arFontSizes = {"7", "9", "10", "11", "12", "14", "16"}
-		fontname_control = ChatLog.wndChatOptions:FindChild("strFontName")
-		fontsize_control = ChatLog.wndChatOptions:FindChild("strFontSize")
-		if fontname_control then
-			for i, this_name in pairs(arFontNames) do
-				fontname_control:AddItem(this_name)
-			end
-		end
-		if fontsize_control then
-			for i, this_size in pairs(arFontSizes) do
-				fontsize_control:AddItem(this_size)
-			end
-		end
+		local arMasterFontList = {
+									"CRB_Interface9",
+									"CRB_Interface9_I",
+									"CRB_Interface9_B",
+									"CRB_Interface10",
+									"CRB_Interface10_I",
+									"CRB_Interface10_B",
+									"CRB_Interface11",
+									"CRB_Interface11_I",
+									"CRB_Interface11_B",
+									"CRB_Interface12",
+									"CRB_Interface12_I",
+									"CRB_Interface12_B",
+									"CRB_Interface14",
+									"CRB_Interface14_I",
+									"CRB_Interface14_B",
+									"CRB_Interface16",
+									"CRB_Interface16_I",
+									"CRB_Interface16_B",
+									"CRB_Header9",
+									"CRB_Header10",
+									"CRB_Header11",
+									"CRB_Header12",
+									"CRB_Header14",
+									"CRB_Header16",
+									"CRB_Header20",
+									"CRB_Header24",
+								}
 		
+		local cntrls = {}
+								
+		cntrls["strFontOption"] = ChatLog.wndChatOptions:FindChild("strFontOption")
+		cntrls["strRPFontOption"] = ChatLog.wndChatOptions:FindChild("strRPFontOption")
+		cntrls["strBubbleFontOption"] = ChatLog.wndChatOptions:FindChild("strBubbleFontOption")
+		cntrls["strBubbleRPFontOption"] = ChatLog.wndChatOptions:FindChild("strBubbleRPFontOption")
+		
+		for i, this_cntrl in pairs(cntrls) do
+			if this_cntrl then
+				for i, this_font in pairs(arMasterFontList) do
+					this_cntrl:AddItem(this_font)
+				end
+			end
+		end
+	
 		--setting controls
 		if ChatLog.bEnableBGFade then
 			btnEnableBGFade = ChatLog.wndChatOptions:FindChild("EnableFadeBtn")
@@ -345,6 +374,10 @@ function Killroy:ChatLogOptions_Check()
 		
 		ChatLog.wndChatOptions:FindChild("ProfanityOn"):SetCheck(Apollo.GetConsoleVariable("chat.filter"))
 		ChatLog.wndChatOptions:FindChild("ProfanityOff"):SetCheck(not(Apollo.GetConsoleVariable("chat.filter")))
+		
+		--
+		ChatLog.strBubbleFontOption = ChatLog.strFontOption
+		ChatLog.strBubbleRPFontOption = ChatLog.strRPFontOption
 
 		self.ChatLogOptionsTimer:Stop()
 	end
@@ -2207,7 +2240,7 @@ function Killroy:Change_HelperGenerateChatMessage()
 				local crBubbleText = kstrColorChatRegular
 				local strChatFont = self.strFontOption
 				--local strBubbleFont = kstrBubbleFont
-				local strBubbleFont = self.strFontOption
+				local strBubbleFont = self.strBubbleFontOption
 				local tLink = {}
 
 
@@ -2243,7 +2276,7 @@ function Killroy:Change_HelperGenerateChatMessage()
 						crBubbleText = kstrColorChatRoleplay
 						strChatFont = self.strRPFontOption
 						--strBubbleFont = kstrDialogFontRP
-						strBubbleFont = self.strRPFontOption
+						strBubbleFont = self.strBubbleRPFontOption
 					end
 
 					if bAlien or tSegment.bProfanity then -- Weak filter. Note only profanity is scrambled.
@@ -2606,29 +2639,34 @@ function Killroy:Append_OnFontChange()
 	Apollo.RegisterEventHandler("OnFontChange", OnFontChange, ChatLog)
 	
 	function ChatLog:OnFontChange( wndHandler, wndControl )
-		local fontface = ChatLog.wndChatOptions:FindChild("strFontName")
-		local fontsize = ChatLog.wndChatOptions:FindChild("strFontSize")
+		local which_font_option = wndControl:GetName()
+		local which_font = ""
 		
-		if not(fontface:GetSelectedText()) then 
-			strFontName = fontface:GetText()
+		if not(wndControl:GetSelectedText()) then 
+			which_font = wndControl:GetText()
 		else
-			strFontName = fontface:GetSelectedText()
+			which_font = wndControl:GetSelectedText()
+		end
+					
+		wndControl:SetFont(which_font)
+		
+		Print(string.format("option: %s, font: %s", which_font_option, which_font))
+		
+		if which_font_option == "strFontOption" then
+			ChatLog.strFontOption = which_font
 		end
 		
-		if not(fontsize:GetSelectedText()) then
-			strFontSize = fontsize:GetText()
-		else
-			strFontSize = fontsize:GetSelectedText()
+		if which_font_option == "strRPFontOption" then
+			ChatLog.strRPFontOption = which_font
 		end
 		
-		local font = strFontName .. strFontSize
-		fontface:SetFont(font)
-		fontsize:SetFont(font)
+		if which_font_option == "strBubbleFontOption" then
+			ChatLog.strBubbleFontOption = which_font
+		end
 		
-		Print(font)
-		
-		ChatLog.strFontOption = font
-		ChatLog.strRPFontOption = font .. "_I"
+		if which_font_option == "strBubbleRPFontOption" then
+			ChatLog.strBubbleRPFontOption = which_font
+		end		
 	end	
 end
 
