@@ -104,9 +104,9 @@ local tagOOC = 103
 local knDefaultSayRange = 30
 local knDefaultEmoteRange = 60
 local knDefaultFalloff = 5
-local ksDefaultEmoteColor = 'ffff9900'
-local ksDefaultSayColor = 'ffffffff'
-local ksDefaultOOCColor = 'ff7fffb9'
+local ksDefaultEmoteColor = "ffff9900"
+local ksDefaultSayColor = "ffffffff"
+local ksDefaultOOCColor = "ff7fffb9"
 local knDefaultICBlend = 0.5
 local knDefaultEmoteBlend = 1.0
 local knDefaultOOCBlend = 1.0
@@ -144,7 +144,11 @@ function Killroy:new(o)
 			nEmoteBlend = knDefaultEmoteBlend,
 			nOOCBlend = knDefaultOOCBlend,
 			bLegacy = true,
-			sVersion = "1-5-0"
+			sVersion = "1-5-0",
+			strFontOption = "CRB_Interface12",
+			strRPFontOption = "CRB_Interface12_I",
+			strBubbleFontOption = "CRB_Interface12",
+			strBubbleRPFontOption = "CRB_Interface12_I",
 		}
 		self.tColorBuffer = 
 		{
@@ -170,20 +174,20 @@ function Killroy:new(o)
 	else
 		self.tColorBuffer = 
 		{
-			kstrEmoteColor = self.tPrefs['kstrEmoteColor'],
-			kstrSayColor = self.tPrefs['kstrSayColor'],
-			kstrOOCColor 	= self.tPrefs['kstrOOCColor'],
+			kstrEmoteColor = self.tPrefs["kstrEmoteColor"],
+			kstrSayColor = self.tPrefs["kstrSayColor"],
+			kstrOOCColor 	= self.tPrefs["kstrOOCColor"],
 		}
 		self.tRFBuffer =
 		{
-			nSayRange = self.tPrefs['nSayRange'],
-			nEmoteRange = self.tPrefs['nEmoteRange'],
-			nFalloff = self.tPrefs['nFalloff'],
+			nSayRange = self.tPrefs["nSayRange"],
+			nEmoteRange = self.tPrefs["nEmoteRange"],
+			nFalloff = self.tPrefs["nFalloff"],
 		}
 		self.tBlendBuffer = {
-			nICBlend = self.tPrefs['nICBlend'],
-			nEmoteBlend = self.tPrefs['nEmoteBlend'],
-			nOOCBlend = self.tPrefs['nOOCBlend'],
+			nICBlend = self.tPrefs["nICBlend"],
+			nEmoteBlend = self.tPrefs["nEmoteBlend"],
+			nOOCBlend = self.tPrefs["nOOCBlend"],
 		}
 	end
 	
@@ -220,16 +224,15 @@ function Killroy:OnDocumentLoaded()
 	
 	self.wndMain = Apollo.LoadForm(self.xmlDoc, "KillroyForm", nil, self)
 	self.wndMain:Show(false, true)
-	--self.wndTest = Apollo.LoadForm(self.xmlDoc, "RPFilter", nil, self)
-	--self.wndTest:Show(true,true)
+	self:Setup_FontFaces()
 
 	--register commands and actions
 	Apollo.RegisterSlashCommand("killroy", "OnKillroyOn", self)
 	Apollo.RegisterSlashCommand("klabout", "KillroyAbout", self)
 	Apollo.RegisterSlashCommand("kl", "Command", self)
-	Apollo.RegisterEventHandler('OnSetEmoteColor', OnSetEmoteColor, self)
-	Apollo.RegisterEventHandler('OnSetSayColor', OnSetSayColor, self)
-	Apollo.RegisterEventHandler('OnSetOOCColor', OnSetOOCColor, self)
+	Apollo.RegisterEventHandler("OnSetEmoteColor", OnSetEmoteColor, self)
+	Apollo.RegisterEventHandler("OnSetSayColor", OnSetSayColor, self)
+	Apollo.RegisterEventHandler("OnSetOOCColor", OnSetOOCColor, self)
 	Apollo.RegisterEventHandler("OnICBlend", OnICBlend, self)
 	Apollo.RegisterEventHandler("OnEmoteBlend", OnEmoteBlend, self)
 	Apollo.RegisterEventHandler("OnOOCBlend", OnOOCBlend, self)
@@ -240,8 +243,6 @@ function Killroy:OnDocumentLoaded()
 	self:Change_OnRoleplayBtn()
 	self:Change_OnChatMessage()
 	self:Change_VerifyChannelVisibility()
-	
-	-- Custom Chat Colors Code, no longer optional
 	self:Change_AddChannelTypeToList()
 	self:Append_OnChannelColorBtn()
 	self:Append_OnRPChannel()
@@ -255,18 +256,7 @@ function Killroy:OnDocumentLoaded()
 	self:Change_HelperFindAViewedChannel()
 	self:Change_OnSettings()
 	self.arChatColorTimer = ApolloTimer.Create(2, true, "arChatColor_Check", self)
-	self.ChatLogOptionsTimer = ApolloTimer.Create(2, true, "ChatLogOptions_Check", self)
-	
-	-- ChatLog Options Event Handler Overrides
-	self:Change_OnProfanityFilter()
-	self:Change_OnTimestamp()
-	self:Change_OnChannelLabel()
-	self:Change_OnSaveToLog()
-	self:Change_OnBGFade()
-	self:Change_OnBGDrawSlider()
-	self:Append_OnFontChange()
-
-	
+	self.ChatLogSettingsTimer = ApolloTimer.Create(2, true, "ChatLogSettings_Check", self)
 	
 	--RPChannelSetup
 	if table.maxn(self.arRPChannels) == 0 then
@@ -289,122 +279,107 @@ function Killroy:arChatColor_Check()
 	end
 end
 
-function Killroy:ChatLogOptions_Check()
+function Killroy:ChatLogSettings_Check()
 	ChatLog = Apollo.GetAddon("ChatLog")
 	if not ChatLog then return nil end
 	
-	if ChatLog.wndChatOptions then
-		ChatLog.wndChatOptions = Apollo.LoadForm(self.xmlDoc, "ChatOptionsForm", nil, ChatLog)
-		ChatLog.wndChatOptions:Show(true)
+	if next(self.tChatLogPrefs) == nil then
+		self:CaptureChatLogSettings()
+		self.CaptureChatLogSettingsTimer:Stop()
+	else
+		self:RestoreChatLogPrefs()
+		self.ChatLogSettingsTimer:Stop()
+	end
+end
+
+function Killroy:Setup_FontFaces()
 		
-		--font selection setup
-		local arMasterFontList = {
-									"CRB_Interface9",
-									"CRB_Interface9_I",
-									"CRB_Interface9_B",
-									"CRB_Interface10",
-									"CRB_Interface10_I",
-									"CRB_Interface10_B",
-									"CRB_Interface11",
-									"CRB_Interface11_I",
-									"CRB_Interface11_B",
-									"CRB_Interface12",
-									"CRB_Interface12_I",
-									"CRB_Interface12_B",
-									"CRB_Interface14",
-									"CRB_Interface14_I",
-									"CRB_Interface14_B",
-									"CRB_Interface16",
-									"CRB_Interface16_I",
-									"CRB_Interface16_B",
-									"CRB_Header9",
-									"CRB_Header10",
-									"CRB_Header11",
-									"CRB_Header12",
-									"CRB_Header14",
-									"CRB_Header16",
-									"CRB_Header20",
-									"CRB_Header24",
-								}
-		
-		local cntrls = {}
-								
-		cntrls["strFontOption"] = ChatLog.wndChatOptions:FindChild("strFontOption")
-		cntrls["strRPFontOption"] = ChatLog.wndChatOptions:FindChild("strRPFontOption")
-		cntrls["strBubbleFontOption"] = ChatLog.wndChatOptions:FindChild("strBubbleFontOption")
-		cntrls["strBubbleRPFontOption"] = ChatLog.wndChatOptions:FindChild("strBubbleRPFontOption")
-		
-		for i, this_cntrl in pairs(cntrls) do
-			if this_cntrl then
-				for i, this_font in pairs(arMasterFontList) do
-					this_cntrl:AddItem(this_font)
-				end
+	--font selection setup
+	local arMasterFontList = {
+								"CRB_Interface9",
+								"CRB_Interface9_I",
+								"CRB_Interface9_B",
+								"CRB_Interface10",
+								"CRB_Interface10_I",
+								"CRB_Interface10_B",
+								"CRB_Interface11",
+								"CRB_Interface11_I",
+								"CRB_Interface11_B",
+								"CRB_Interface12",
+								"CRB_Interface12_I",
+								"CRB_Interface12_B",
+								"CRB_Interface14",
+								"CRB_Interface14_I",
+								"CRB_Interface14_B",
+								"CRB_Interface16",
+								"CRB_Interface16_I",
+								"CRB_Interface16_B",
+								"CRB_Header9",
+								"CRB_Header10",
+								"CRB_Header11",
+								"CRB_Header12",
+								"CRB_Header14",
+								"CRB_Header16",
+								"CRB_Header20",
+								"CRB_Header24",
+							}
+	
+	local cntrls = {}
+							
+	cntrls["strFontOption"] = self.wndMain:FindChild("strFontOption")
+	cntrls["strRPFontOption"] = self.wndMain:FindChild("strRPFontOption")
+	cntrls["strBubbleFontOption"] = self.wndMain:FindChild("strBubbleFontOption")
+	cntrls["strBubbleRPFontOption"] = self.wndMain:FindChild("strBubbleRPFontOption")
+	
+	for i, this_cntrl in pairs(cntrls) do
+		if this_cntrl then
+			for i, this_font in pairs(arMasterFontList) do
+				this_cntrl:AddItem(this_font)
 			end
 		end
-	
-		--setting controls
-		if ChatLog.bEnableBGFade then
-			btnEnableBGFade = ChatLog.wndChatOptions:FindChild("EnableFadeBtn")
-			btnEnableBGFade:SetCheck(true)
-		end
-		
-		if ChatLog.bEnableNCFade then
-			btnEnableNCFade = ChatLog.wndChatOptions:FindChild("DisableFadeBtn")
-			btnEnableNCFade:SetCheck(true)
-		end
-		
-		if ChatLog.nBGOpacity then
-			sliderBGOpacity = ChatLog.wndChatOptions:FindChild("BGOpacity:BGOpacitySlider")
-			sliderBGOpacity:SetValue(ChatLog.nBGOpacity)
-		end
-		
-		bSaveToLog = Apollo.GetConsoleVariable("chat.saveLog")
-		ChatLog.wndChatOptions:FindChild("SaveToLogOn"):SetCheck(bSaveToLog)
-		ChatLog.wndChatOptions:FindChild("SaveToLogOff"):SetCheck(not(bSaveToLog))
-		
-		btnChannelShow = ChatLog.wndChatOptions:FindChild("ChannelShow")
-		btnChannelShowOff = ChatLog.wndChatOptions:FindChild("ChannelShowOff")
-		if ChatLog.bShowChannel then	
-			btnChannelShow:SetCheck(ChatLog.bShowChannel)
-			btnChannelShowOff:SetCheck(not(ChatLog.bShowChannel))
-		end
-		
-		ChatLog.wndChatOptions:FindChild("TimestampShow"):SetCheck(ChatLog.bShowTimestamp)
-		ChatLog.wndChatOptions:FindChild("TimestampShowOff"):SetCheck(not(ChatLog.bShowTimestamp))
-		
-		ChatLog.wndChatOptions:FindChild("ProfanityOn"):SetCheck(Apollo.GetConsoleVariable("chat.filter"))
-		ChatLog.wndChatOptions:FindChild("ProfanityOff"):SetCheck(not(Apollo.GetConsoleVariable("chat.filter")))
-		
-		--
-		ChatLog.strBubbleFontOption = ChatLog.strFontOption
-		ChatLog.strBubbleRPFontOption = ChatLog.strRPFontOption
-
-		self.ChatLogOptionsTimer:Stop()
 	end
 end
 
 function Killroy:OnConfigure()
-	self.wndMain:FindChild('sVersion'):SetText(self.tPrefs['sVersion'])
-	self.wndMain:FindChild('bCrossFaction'):SetCheck(self.tPrefs['bCrossFaction'])
-	self.wndMain:FindChild('bRPOnly'):SetCheck(self.tPrefs['bRPOnly'])
-	self.wndMain:FindChild('bShowAll'):SetCheck(self.tPrefs['bShowAll'])
-	self.wndMain:FindChild('bFormatChat'):SetCheck(self.tPrefs['bFormatChat'])
-	self.wndMain:FindChild('bRangeFilter'):SetCheck(self.tPrefs['bRangeFilter'])
-	self.wndMain:FindChild('bUseOcclusion'):SetCheck(self.tPrefs['bUseOcclusion'])
-	--self.wndMain:FindChild('bCustomChatColors'):SetCheck(self.tPrefs['bCustomChatColors'])
-	self.wndMain:FindChild('setEmoteColor'):SetBGColor(self.tPrefs['kstrEmoteColor'])
-	self.wndMain:FindChild('bLegacy'):SetCheck(self.tPrefs['bLegacy'])
-	self.wndMain:FindChild('nEmoteBlend'):SetValue(self.tPrefs['nEmoteBlend'])
-	self.wndMain:FindChild('setSayColor'):SetBGColor(self.tPrefs['kstrSayColor'])
-	self.wndMain:FindChild('nICBlend'):SetValue(self.tPrefs['nICBlend'])
-	self.wndMain:FindChild('setOOCColor'):SetBGColor(self.tPrefs['kstrOOCColor'])
-	self.wndMain:FindChild('nOOCBlend'):SetValue(self.tPrefs['nOOCBlend'])
-	self.wndMain:FindChild('nSayRange'):SetValue(self.tPrefs['nSayRange'])
-	self.tRFBuffer['nSayRange'] = self.tPrefs['nSayRange']
-	self.wndMain:FindChild('nEmoteRange'):SetValue(self.tPrefs['nEmoteRange'])
-	self.tRFBuffer['nEmoteRange'] = self.tPrefs['nEmoteRange']
-	self.wndMain:FindChild('nFalloff'):SetValue(self.tPrefs['nFalloff'])
-	self.tRFBuffer['nFalloff'] = self.tPrefs['nFalloff']
+	self.wndMain:FindChild("sVersion"):SetText(self.tPrefs["sVersion"])
+	self.wndMain:FindChild("bCrossFaction"):SetCheck(self.tPrefs["bCrossFaction"])
+	self.wndMain:FindChild("bRPOnly"):SetCheck(self.tPrefs["bRPOnly"])
+	self.wndMain:FindChild("bShowAll"):SetCheck(self.tPrefs["bShowAll"])
+	self.wndMain:FindChild("bFormatChat"):SetCheck(self.tPrefs["bFormatChat"])
+	self.wndMain:FindChild("bRangeFilter"):SetCheck(self.tPrefs["bRangeFilter"])
+	self.wndMain:FindChild("bUseOcclusion"):SetCheck(self.tPrefs["bUseOcclusion"])
+	self.wndMain:FindChild("setEmoteColor"):SetBGColor(self.tPrefs["kstrEmoteColor"])
+	self.wndMain:FindChild("bLegacy"):SetCheck(self.tPrefs["bLegacy"])
+	self.wndMain:FindChild("nEmoteBlend"):SetValue(self.tPrefs["nEmoteBlend"])
+	self.wndMain:FindChild("setSayColor"):SetBGColor(self.tPrefs["kstrSayColor"])
+	self.wndMain:FindChild("nICBlend"):SetValue(self.tPrefs["nICBlend"])
+	self.wndMain:FindChild("setOOCColor"):SetBGColor(self.tPrefs["kstrOOCColor"])
+	self.wndMain:FindChild("nOOCBlend"):SetValue(self.tPrefs["nOOCBlend"])
+	self.wndMain:FindChild("nSayRange"):SetValue(self.tPrefs["nSayRange"])
+	self.tRFBuffer["nSayRange"] = self.tPrefs["nSayRange"]
+	self.wndMain:FindChild("nEmoteRange"):SetValue(self.tPrefs["nEmoteRange"])
+	self.tRFBuffer["nEmoteRange"] = self.tPrefs["nEmoteRange"]
+	self.wndMain:FindChild("nFalloff"):SetValue(self.tPrefs["nFalloff"])
+	self.tRFBuffer["nFalloff"] = self.tPrefs["nFalloff"]
+	
+	--ChatLog Options Override Section
+	self.wndMain:FindChild("bProfanityFilter"):SetCheck(self.tChatLogPrefs["bProfanityFilter"])
+	self.wndMain:FindChild("bTimestamp"):SetCheck(self.tChatLogPrefs["bShowTimestamp"])
+	self.wndMain:FindChild("bSaveToLog"):SetCheck(self.tChatLogPrefs["bSaveToLog"])
+	self.wndMain:FindChild("bShowChannel"):SetCheck(self.tChatLogPrefs["bShowChannel"])
+	self.wndMain:FindChild("bMouseFade"):SetChecl(self.tChatLogPrefs["bEnableBGFade"])
+	self.wndMain:FindChild("nOpacity"):SetValue(self.tChatLogPrefs["nBGOpacity"])
+	
+	--Font Selected Setup
+	local cntrls = {}
+	local optns = {"strFontOption", "strRPFontOption", "strBubbleFontOption", "strBubbleRPFontOption"}
+	
+	for i, this_optn in pairs(optns) do
+		cntrls[this_optn] = self.wndMain:FindChild(this_optn)
+		cntrls[this_optn]:SetText(self.tPrefs[this_optn])
+		cntrls[this_optn]:SetFont(self.tPrefs[this_optn])
+	end
+			
 	self.wndMain:Show(true)
 end
 
@@ -434,7 +409,7 @@ function Killroy:OnSave(eLevel)
 end
 
 function Killroy:OnRestore(eLevel, tData)
-	--Killroy's Prefs
+	--Killroy"s Prefs
 	if (tData.tPrefs ~= nil) then
 		for i,v in pairs(tData.tPrefs) do
 			self.tPrefs[i] = v
@@ -456,8 +431,8 @@ function Killroy:OnRestore(eLevel, tData)
 		end
 	end
 	
-	self.tPrefs['sVersion'] = "1-5-0"
-	self.tPrefs['bCustomChatColors'] = true
+	self.tPrefs["sVersion"] = "1-5-0"
+	self.tPrefs["bCustomChatColors"] = true
 	
 	if (tData.tChatLogPrefs ~= nil) then
 		for i,v in pairs(tData.tChatLogPrefs) do
@@ -497,7 +472,7 @@ function Killroy:SetupRPChannels()
 end
 
 function Killroy:SetRPChannel(chan, bFlag)
-	if self.tPrefs['bCustomChatColors'] then
+	if self.tPrefs["bCustomChatColors"] then
 		nType = self:ChannelCludge(chan:GetName(), chan:GetType())
 	else
 		nType = chan:GetType()
@@ -537,7 +512,7 @@ end
 function Killroy:GetChannelByNumber(nType)
 	bNotFound = true
 	for i, this_chan in ipairs(ChatSystemLib.GetChannels()) do
-		if self.tPrefs['bCustomChatColors'] then
+		if self.tPrefs["bCustomChatColors"] then
 			nChannel = self:ChannelCludge(this_chan:GetName(), this_chan:GetType())
 		else
 			nChannel = this_chan:GetType()
@@ -718,7 +693,6 @@ function Killroy:Command(...)
 									}
 					chanCommand = self:GetChannelByName("Command")
 					self:SetupRPChannels()
-					chanCommand:Send("/reloadui")
 			
 				--getcolor, gets channel colors of channels sent to it
 				elseif sFlag == "-getclr" then
@@ -797,7 +771,7 @@ end
 function Killroy:ParseForContext(strText, eChannelType)
 	-- search for asterik emotes
 	-- search for quotes
-	-- search for OOC '((<verbage>))'
+	-- search for OOC "((<verbage>))"
 	-- color remainder with channel color
 	
 	--[[
@@ -823,48 +797,48 @@ function Killroy:ParseForContext(strText, eChannelType)
 	oocs = {}
 	
 	index = 1
-	for emote in strText:gmatch('%b**') do
+	for emote in strText:gmatch("%b**") do
 		first, last = strText:find(emote, index, true)
 		emotes[first] = last
 		index = last + 1
 	end
 	
 	index = 1
-	for quote in strText:gmatch('%b""') do
+	for quote in strText:gmatch("%b\"\"") do
 		first, last = strText:find(quote, index, true)
 		quotes[first] = last
 		index = last + 1
 	end
 	
 	index = 1
-	for ooc in strText:gmatch('%(%(.*%)%)') do
+	for ooc in strText:gmatch("%(%(.*%)%)") do
 		first, last = strText:find(ooc, index, true)
 		oocs[first] = last
 		index = last + 1
 	end
 	
-	buffer = ''
+	buffer = ""
 	index = 1
 	
 	while index <= strText:len() do
 		if oocs[index] then
 			if buffer then
 				table.insert(parsedText, {buffer, tagByChan()})
-				buffer = ''
+				buffer = ""
 			end
 			table.insert(parsedText, {strText:sub(index, oocs[index]), tagOOC})
 			index = oocs[index] + 1
 		elseif emotes[index] then
 			if buffer then
 				table.insert(parsedText, {buffer, tagByChan()})
-				buffer = ''
+				buffer = ""
 			end
 			table.insert(parsedText, {strText:sub(index, emotes[index]), tagEmo})
 			index = emotes[index] + 1
 		elseif quotes[index] then
 			if buffer then
 				table.insert(parsedText, {buffer, tagByChan()})
-				buffer = ''
+				buffer = ""
 			end
 			table.insert(parsedText, {strText:sub(index, quotes[index]), tagSay})
 			index = quotes[index] + 1
@@ -874,7 +848,7 @@ function Killroy:ParseForContext(strText, eChannelType)
 		end
 	end
 	
-	if buffer ~= '' then
+	if buffer ~= "" then
 		table.insert(parsedText, {buffer, tagByChan()})
 	end
 
@@ -906,19 +880,19 @@ function Killroy:DumpToChat(parsedText, nChannel, strChatFont, xml)
 		local bIsSay = nChannel == ChatSystemLib.ChatChannel_Say
 		local bIsEmote = nChannel == ChatSystemLib.ChatChannel_Emote
 		
-		if (bIsSay or bIsEmote) and self.tPrefs['bLegacy'] then
+		if (bIsSay or bIsEmote) and self.tPrefs["bLegacy"] then
 			return 1.0
 		else
 			return nBlend
 		end
 	end
 	
-	local AC_OOC = ApolloColor.new(self.tPrefs['kstrOOCColor'])
-	local AC_IC = ApolloColor.new(self.tPrefs['kstrSayColor'])
-	local AC_EMO = ApolloColor.new(self.tPrefs['kstrEmoteColor'])	
-	local AC_BlendColorOOC = self:ABOverColor(ChatLog.arChatColor[nChannel], AC_OOC, Legacy(nChannel, self.tPrefs['nOOCBlend']))
-	local AC_BlendColorEmote = self:ABOverColor(ChatLog.arChatColor[nChannel], AC_EMO, Legacy(nChannel, self.tPrefs['nEmoteBlend']))
-	local AC_BlendColorIC = self:ABOverColor(ChatLog.arChatColor[nChannel], AC_IC, Legacy(nChannel, self.tPrefs['nICBlend']))
+	local AC_OOC = ApolloColor.new(self.tPrefs["kstrOOCColor"])
+	local AC_IC = ApolloColor.new(self.tPrefs["kstrSayColor"])
+	local AC_EMO = ApolloColor.new(self.tPrefs["kstrEmoteColor"])	
+	local AC_BlendColorOOC = self:ABOverColor(ChatLog.arChatColor[nChannel], AC_OOC, Legacy(nChannel, self.tPrefs["nOOCBlend"]))
+	local AC_BlendColorEmote = self:ABOverColor(ChatLog.arChatColor[nChannel], AC_EMO, Legacy(nChannel, self.tPrefs["nEmoteBlend"]))
+	local AC_BlendColorIC = self:ABOverColor(ChatLog.arChatColor[nChannel], AC_IC, Legacy(nChannel, self.tPrefs["nICBlend"]))
 		
 	for i,t in ipairs(parsedText) do
 		if t[2] == tagEmo then
@@ -938,7 +912,7 @@ function Killroy:DumpToChat(parsedText, nChannel, strChatFont, xml)
 	return true
 end
 
--- TB's contribution to the range filter code, edits by bs:061914
+-- TB"s contribution to the range filter code, edits by bs:061914
 
 function Killroy:Distance(unitTarget)
     local unitPlayer = GameLib.GetPlayerUnit()
@@ -1010,9 +984,9 @@ end
 
 function Killroy:RangeFilter(sMessage, sSender, eChannelType)
 	--[[
-	I. Context, does the messsage contain the player's name?
+	I. Context, does the messsage contain the player"s name?
 		A. if so, half the range
-	II. Occlusion, doesn't stop sound, stops sight
+	II. Occlusion, doesn"t stop sound, stops sight
 		A. if channel is "say", then double range if occluded
 		B. if channel is emote or animated emote, cull message
 	III. check range
@@ -1029,7 +1003,7 @@ function Killroy:RangeFilter(sMessage, sSender, eChannelType)
 	
 	local bEnableDebug = false
 	if bEnableDebug then
-		if sSender == GameLib.GetPlayerUnit():GetName() then nRange = self.tPrefs['nSayRange'] + 6 end
+		if sSender == GameLib.GetPlayerUnit():GetName() then nRange = self.tPrefs["nSayRange"] + 6 end
 	end
 	
 	local sPlayer = GameLib.GetPlayerUnit():GetName()
@@ -1151,8 +1125,30 @@ end
 -- Killroy Change Methods, these replace ChatLog methods
 --------------------------------------------------------
 
-function CaptureChatLogSettings()
+function Killroy:CaptureChatLogSettings()
 
+	ChatLog = Apollo.GetAddon("ChatLog")
+	if not ChatLog then return nil end
+	
+	self.tChatLogPrefs["bProfanityFilter"] = ChatLog.bProfanityFilter
+	self.tChatLogPrefs["bShowTimestamp"] = ChatLog.bShowTimestamp
+	self.tChatLogPrefs["bShowChannel"] = ChatLog.bShowChannel
+	self.tChatLogPrefs["bSaveToLog"] = ChatLog.bSaveToLog
+	self.tChatLogPrefs["bEnableBGFade"] = ChatLog.bEnableBGFade
+	self.tChatLogPrefs["bEnableNCFade"] = ChatLog.bEnableNCFade
+	self.tChatLogPrefs["nBGOpacity"] = ChatLog.nBGOpacity
+	
+end
+
+function Killroy:Override_ChatLog_ProfanityFilter()
+	ChatLog = Apollo.GetAddon("ChatLog")
+	if not ChatLog then return nil end
+	
+	ChatLog.bProfanityFilter = self.tChatLogPrefs["bProfanityFilter"]
+	for i, this_chan in ipairs(ChatSystemLib.GetChannels()) do
+		this_chan:SetProfanity(self.tChatLogPrefs["bProfanityFilter"])
+	end
+	Apollo.SetConsoleVariable("chat.filter", self.tChatLogPrefs["bProfanityFilter"])
 end
 
 function Killroy:Change_OnProfanityFilter()
@@ -1180,6 +1176,15 @@ function Killroy:Change_OnProfanityFilter()
 	end
 end
 
+function Killroy:Override_ChatLog_Timestamp()
+
+	ChatLog = Apollo.GetAddon("ChatLog")
+	if not ChatLog then return nil end
+	
+	ChatLog.bShowTimestamp = self.tChatLogPrefs["bShowTimestamp"]
+
+end
+
 function Killroy:Change_OnTimestamp()
 	ChatLog = Apollo.GetAddon("ChatLog")
 	if not ChatLog then return nil end
@@ -1194,6 +1199,14 @@ function Killroy:Change_OnTimestamp()
 	end
 end
 
+
+function Killroy:Override_ChatLog_ShowChannel()
+	ChatLog = Apollo.GetAddon("ChatLog")
+	if not ChatLog then return nil end
+	
+	ChatLog.bShowChannel = self.tChatLogPrefs["bShowChannel"]
+end
+
 function Killroy:Change_OnChannelLabel()
 	ChatLog = Apollo.GetAddon("ChatLog")
 	if not ChatLog then return nil end
@@ -1206,6 +1219,15 @@ function Killroy:Change_OnChannelLabel()
 			ChatLog.bShowChannel = true
 		end
 	end
+end
+
+function Killroy:Override_ChatLog_SaveToLog()
+
+	ChatLog = Apollo.GetAddon("ChatLog")
+	if not ChatLog then return nil end
+	
+	ChatLog.SaveToLog = self.tChatLogPrefs["bSaveToLog"]
+	Apollo.SetConsoleVariable("chat.saveLog", self.tChatLogPrefs["bSaveToLog"]
 end
 
 function Killroy:Change_OnSaveToLog()
@@ -1228,6 +1250,23 @@ function Killroy:Change_OnSaveToLog()
 			ChatLog.bSaveToLog = false
 			Apollo.SetConsoleVariable("chat.saveLog", false)
 		end
+	end
+end
+
+function Killroy:Override_ChatLog_Mousefade()
+
+	ChatLog = Apollo.GetAddon("ChatLog")
+	if not ChatLog then return nil end
+	
+	ChatLog.bEnableNCFade = self.tChatLogPrefs["bEnableBGFade"]
+	ChatLog.bEnableNCFade = self.tChatLogPrefs["bEnableNCFade"]
+	
+	for i, this_chat_wnd in pairs(ChatLog.tChatWindows) do
+		this_chat_wnd:SetStyle("AutoFadeNC", self.tChatLogPrefs["bEnableNCFade"])
+		if self.tChatLogPrefs["bEnableNCFade"] then this_chat_wnd:SetNCOpacity(1) end
+		
+		this_chat_wnd:SetStyle("AutoFadeBG", self.tChatLogPrefs["bEnableBGFade"])
+		if self.tChatLogPrefs["bEnableBGFade"] then this_chat_wnd:SetBGOpacity(1) end
 	end
 end
 
@@ -1257,6 +1296,18 @@ function Killroy:Change_OnBGFade()
 			wndChatWindow:SetStyle("AutoFadeBG", ChatLog.bEnableBGFade)
 			if ChatLog.bEnableBGFade then wndChatWindow:SetBGOpacity(1) end
 		end
+	end
+end
+
+function Killroy:Override_ChatLog_Opacity()
+	ChatLog = Apollo.GetAddon("ChatLog")
+	if not ChatLog then return nil end
+	
+	ChatLog.nBGOpacity = self.tChatLogPrefs["nBGOpacity"]
+	
+	for i, this_wnd in pairs(ChatLog.tChatWindows) do
+		this_wnd:FindChild("BGArt"):SetBGColor(CColor.new(1.0, 1.0, 1.0, ChatLog.nBGOpacity))
+		this_wnd:FindChild("BGArt_SidePanel"):SetBGColor(CColor.new(1.0, 1.0, 1.0, ChatLog.nBGOpacity))
 	end
 end
 
@@ -1310,7 +1361,7 @@ function Killroy:Change_OnSettings()
 		end
 		
 		for idx, this_channel in ipairs(ChatSystemLib.GetChannels()) do
-			if Killroy.tPrefs['bCustomChatColors'] then
+			if Killroy.tPrefs["bCustomChatColors"] then
 				nCludge = Killroy:ChannelCludge(this_channel:GetName(), this_channel:GetType())
 			else
 				nCludge = this_channel:GetType()
@@ -1372,7 +1423,7 @@ function Killroy:Change_HelperRemoveChannelFromInputWindow()
 	ChatLog = Apollo.GetAddon("ChatLog")
 	if not ChatLog then return nil end
 	
-	function ChatLog:HelperRemoveChannelFromInputWindow(channelRemoved) -- used when we've totally removed a channel
+	function ChatLog:HelperRemoveChannelFromInputWindow(channelRemoved) -- used when we"ve totally removed a channel
 		Killroy = Apollo.GetAddon("Killroy")
 		if not Killroy then return nil end
 		
@@ -1504,7 +1555,7 @@ function Killroy:Change_BuildInputTypeMenu()
 			local nCludge = Killroy:ChannelCludge(channelCurrent:GetName(),channelCurrent:GetType())
 			--if self.tAllViewedChannels[ channelCurrent:GetType() ] ~= nil then, disabled bs070414
 			if self.tAllViewedChannels[nCludge] ~= nil then
-				if channelCurrent:GetCommand() ~= nil and channelCurrent:GetCommand() ~= "" then -- make sure it's a channelCurrent that can be spoken into
+				if channelCurrent:GetCommand() ~= nil and channelCurrent:GetCommand() ~= "" then -- make sure it"s a channelCurrent that can be spoken into
 					local strCommand = channelCurrent:GetAbbreviation()
 	
 					if strCommand == "" or strCommand == nil then
@@ -2072,13 +2123,13 @@ function Killroy:Change_HelperGenerateChatMessage()
 
 		local strPresenceState = ""
 		if tMessage.bAutoResponse then
-			strPresenceState = '('..Apollo.GetString("AutoResponse_Prefix")..')'
+			strPresenceState = "("..Apollo.GetString("AutoResponse_Prefix")..")"
 		end
 
 		if tMessage.nPresenceState == FriendshipLib.AccountPresenceState_Away then
-			strPresenceState = '<'..Apollo.GetString("Command_Friendship_AwayFromKeyboard")..'>'
+			strPresenceState = "<"..Apollo.GetString("Command_Friendship_AwayFromKeyboard")..">"
 		elseif tMessage.nPresenceState == FriendshipLib.AccountPresenceState_Busy then
-			strPresenceState = '<'..Apollo.GetString("Command_Friendship_DoNotDisturb")..'>'
+			strPresenceState = "<"..Apollo.GetString("Command_Friendship_DoNotDisturb")..">"
 		end
 
 		if eChannelType == ChatSystemLib.ChatChannel_Whisper then
@@ -2136,16 +2187,16 @@ function Killroy:Change_HelperGenerateChatMessage()
 		-- We build strings backwards, right to left
 		if eChannelType == ChatSystemLib.ChatChannel_AnimatedEmote then -- emote animated channel gets special formatting
 			-- bs:051414, incorporating preferences variables
-			if Killroy.tPrefs['bFormatChat'] then
-				xml:AddLine(strTime, Killroy.tPrefs['kstrEmoteColor'], self.strFontOption, "Left")
+			if Killroy.tPrefs["bFormatChat"] then
+				xml:AddLine(strTime, Killroy.tPrefs["kstrEmoteColor"], self.strFontOption, "Left")
 			else
 				xml:AddLine(strTime, crChannel, self.strFontOption, "Left")
 			end
 
 		elseif eChannelType == ChatSystemLib.ChatChannel_Emote then -- emote channel gets special formatting
 			-- bs: 051414, incorporating preferences variables
-			if Killroy.tPrefs['bFormatChat'] then
-				xml:AddLine(strTime, Killroy.tPrefs['kstrEmoteColor'], self.strFontOption, "Left")
+			if Killroy.tPrefs["bFormatChat"] then
+				xml:AddLine(strTime, Killroy.tPrefs["kstrEmoteColor"], self.strFontOption, "Left")
 			else
 				xml:AddLine(strTime, crChannel, self.strFontOption, "Left")
 			end
@@ -2201,7 +2252,7 @@ function Killroy:Change_HelperGenerateChatMessage()
 		for idx, tSegment in ipairs( tMessage.arMessageSegments ) do
 			local strText = tSegment.strText
 			-- bs:051414, incorporating preferences variables
-			local bAlien = tSegment.bAlien or (tMessage.bCrossFaction and not(Killroy.tPrefs['bCrossFaction']))
+			local bAlien = tSegment.bAlien or (tMessage.bCrossFaction and not(Killroy.tPrefs["bCrossFaction"]))
 			local bShow = false
 
 			--[[
@@ -2289,12 +2340,12 @@ function Killroy:Change_HelperGenerateChatMessage()
 				
 				if next(tLink) == nil then
 					-- bs:073014, reworking parse for RPChannels
-					-- if Killroy.tPrefs['bFormatChat'] and ((eChannelType == ChatSystemLib.ChatChannel_Say) or (eChannelType == ChatSystemLib.ChatChannel_Emote)) then
-					if Killroy.tPrefs['bFormatChat'] and bInRPChannel then		
+					-- if Killroy.tPrefs["bFormatChat"] and ((eChannelType == ChatSystemLib.ChatChannel_Say) or (eChannelType == ChatSystemLib.ChatChannel_Emote)) then
+					if Killroy.tPrefs["bFormatChat"] and bInRPChannel then		
 						parsedText = Killroy:ParseForContext(strText, eChannelType)
 						Killroy:DumpToChat(parsedText, eChannelType, strChatFont, xml)
-					elseif Killroy.tPrefs['bFormatChat'] and (eChannelType == ChatSystemLib.ChatChannel_AnimatedEmote) then
-						xml:AppendText(strText, Killroy.tPrefs['kstrEmoteColor'], strChatFont)
+					elseif Killroy.tPrefs["bFormatChat"] and (eChannelType == ChatSystemLib.ChatChannel_AnimatedEmote) then
+						xml:AppendText(strText, Killroy.tPrefs["kstrEmoteColor"], strChatFont)
 					else
 						xml:AppendText(strText, crChatText, strChatFont)
 					end
@@ -2306,7 +2357,7 @@ function Killroy:Change_HelperGenerateChatMessage()
 				end
 
 				if xmlBubble then
-					if Killroy.tPrefs['bFormatChat'] and bInRPChannel then
+					if Killroy.tPrefs["bFormatChat"] and bInRPChannel then
 						parsedText = Killroy:ParseForContext(strText, eChannelType)
 						Killroy:DumpToChat(parsedText, eChannelType, strBubbleFont, xmlBubble)
 					else
@@ -2351,7 +2402,7 @@ function Killroy:Change_OnChatInputReturn()
 			--[[
 			-- bs:091114, old Killroy marker code
 			-- bs:051414, incorporating preferences
-			if not(Killroy.tPrefs['bRPOnly']) then
+			if not(Killroy.tPrefs["bRPOnly"]) then
 				if self.eRoleplayOption == 2 then
 					wndControl:SetText(Apollo.GetString("ChatLog_RPMarker"))
 				end
@@ -2391,7 +2442,7 @@ function Killroy:Change_OnChatInputReturn()
 					tChatData.channelCurrent = channelCurrent
 					--[[
 					-- bs:091114, old Killroy filter code
-					if self.eRoleplayOption == 2 and Killroy.tPrefs['bRPOnly'] then
+					if self.eRoleplayOption == 2 and Killroy.tPrefs["bRPOnly"] then
 						tInput.strMessage = Apollo.GetString("ChatLog_RPMarker") .. tInput.strMessage
 					end
 					]]--
@@ -2449,7 +2500,7 @@ function Killroy:Change_OnRoleplayBtn()
 		local wndParent = wndControl:GetParent()
 		self.eRoleplayOption = wndParent:GetRadioSel("RoleplayViewToggle")
 		for idx, wndChat in pairs(self.tChatWindows) do
-			if not(Killroy.tPrefs['bRPOnly']) then
+			if not(Killroy.tPrefs["bRPOnly"]) then
 				if self.eRoleplayOption == 2 then
 					wndChat:FindChild("Input"):SetText(Apollo.GetString("ChatLog_RPMarker"))
 				else
@@ -2460,29 +2511,38 @@ function Killroy:Change_OnRoleplayBtn()
 		end
 	end
 end
+
+
+
 -----------------------------------------------------------------------------------------------
 -- KillroyForm Functions
 -----------------------------------------------------------------------------------------------
 -- when the OK button is clicked
 function Killroy:OnOK()
 	self.wndMain:Close() -- hide the window
-	self.tPrefs['bCrossFaction'] = (self.wndMain:FindChild('bCrossFaction'):IsChecked())
-	self.tPrefs['bRPOnly'] = (self.wndMain:FindChild('bRPOnly'):IsChecked())
-	self.tPrefs['bShowAll'] = (self.wndMain:FindChild('bShowAll'):IsChecked())
-	self.tPrefs['bFormatChat'] = (self.wndMain:FindChild('bFormatChat'):IsChecked())
-	self.tPrefs['bRangeFilter'] = (self.wndMain:FindChild('bRangeFilter'):IsChecked())
-	self.tPrefs['bUseOcclusion'] = (self.wndMain:FindChild('bUseOcclusion'):IsChecked())
-	--self.tPrefs['bCustomChatColors'] = (self.wndMain:FindChild('bCustomChatColors'):IsChecked())
-	self.tPrefs['bLegacy'] = (self.wndMain:FindChild('bLegacy'):IsChecked())
-	self.tPrefs['kstrEmoteColor'] = self.tColorBuffer['kstrEmoteColor']
-	self.tPrefs['kstrSayColor'] = self.tColorBuffer['kstrSayColor']
-	self.tPrefs['kstrOOCColor'] = self.tColorBuffer['kstrOOCColor']
-	self.tPrefs['nSayRange'] = self.tRFBuffer['nSayRange']
-	self.tPrefs['nEmoteRange'] = self.tRFBuffer['nEmoteRange']
-	self.tPrefs['nFalloff'] = self.tRFBuffer['nFalloff']
-	self.tPrefs['nICBlend'] = self.tBlendBuffer['nICBlend']
-	self.tPrefs['nEmoteBlend'] = self.tBlendBuffer['nEmoteBlend']
-	self.tPrefs['nOOCBlend'] = self.tBlendBuffer['nOOCBlend']
+	self.tPrefs["bCrossFaction"] = (self.wndMain:FindChild("bCrossFaction"):IsChecked())
+	self.tPrefs["bRPOnly"] = (self.wndMain:FindChild("bRPOnly"):IsChecked())
+	self.tPrefs["bShowAll"] = (self.wndMain:FindChild("bShowAll"):IsChecked())
+	self.tPrefs["bFormatChat"] = (self.wndMain:FindChild("bFormatChat"):IsChecked())
+	self.tPrefs["bRangeFilter"] = (self.wndMain:FindChild("bRangeFilter"):IsChecked())
+	self.tPrefs["bUseOcclusion"] = (self.wndMain:FindChild("bUseOcclusion"):IsChecked())
+	
+	--Following line disabled because custom chat colors is mandatory
+	--self.tPrefs["bCustomChatColors"] = (self.wndMain:FindChild("bCustomChatColors"):IsChecked())
+	
+	self.tPrefs["bLegacy"] = (self.wndMain:FindChild("bLegacy"):IsChecked())
+	self.tPrefs["kstrEmoteColor"] = self.tColorBuffer["kstrEmoteColor"]
+	self.tPrefs["kstrSayColor"] = self.tColorBuffer["kstrSayColor"]
+	self.tPrefs["kstrOOCColor"] = self.tColorBuffer["kstrOOCColor"]
+	self.tPrefs["nSayRange"] = self.tRFBuffer["nSayRange"]
+	self.tPrefs["nEmoteRange"] = self.tRFBuffer["nEmoteRange"]
+	self.tPrefs["nFalloff"] = self.tRFBuffer["nFalloff"]
+	self.tPrefs["nICBlend"] = self.tBlendBuffer["nICBlend"]
+	self.tPrefs["nEmoteBlend"] = self.tBlendBuffer["nEmoteBlend"]
+	self.tPrefs["nOOCBlend"] = self.tBlendBuffer["nOOCBlend"]
+	--[[
+	code to reloadui has been disabled because custom chat color is now mandatory
+	
 	-- reloadui if custom chat disabled
 	if self.bReloadUIRequired then
 		self.arRPChannels = {}
@@ -2491,59 +2551,61 @@ function Killroy:OnOK()
 		local ComChan = self:GetChannelByName("Command")
 		ComChan:Send("/reloadui")
 	end
+	]]--
 end
 
 -- when the Cancel button is clicked
 function Killroy:OnCancel()
 	self.wndMain:Close() -- hide the window
-	self.wndMain:FindChild('bCrossFaction'):SetCheck(self.tPrefs['bCrossFaction'])
-	self.wndMain:FindChild('bRPOnly'):SetCheck(self.tPrefs['bRPOnly'])
-	self.wndMain:FindChild('bShowAll'):SetCheck(self.tPrefs['bShowAll'])
-	self.wndMain:FindChild('bFormatChat'):SetCheck(self.tPrefs['bFormat'])
-	self.wndMain:FindChild('bRangeFilter'):SetCheck(self.tPrefs['bRangeFilter'])
-	self.wndMain:FindChild('bUseOcclusion'):SetCheck(self.tPrefs['bUseOcclusion'])
-	--self.wndMain:FindChild('bCustomChatColors'):SetCheck(self.tPrefs['bCustomChatColors'])
-	self.wndMain:FindChild('bLegacy'):SetCheck(self.tPrefs['bLegacy'])
-	self.tColorBuffer['kstrEmoteColor'] = self.tPrefs['kstrEmoteColor'] 
-	self.tColorBuffer['kstrSayColor'] = self.tPrefs['kstrSayColor']
-	self.tColorBuffer['kstrOOCColor'] = self.tPrefs['kstrOOCColor']
-	self.tRFBuffer['nSayRange'] = self.tPrefs['nSayRange']
-	self.tRFBuffer['nEmoteRange'] = self.tPrefs['nEmoteRange']
-	self.tRFBuffer['nFalloff'] = self.tPrefs['nFalloff']
-	self.tBlendBuffer['nICBlend'] = self.tPrefs['nICBlend']
-	self.tBlendBuffer['nEmoteBlend'] = self.tPrefs['nEmoteBlend']
-	self.tBlendBuffer['nOOCBlend'] = self.tPrefs['nOOCBlend']
+	self.wndMain:FindChild("bCrossFaction"):SetCheck(self.tPrefs["bCrossFaction"])
+	self.wndMain:FindChild("bRPOnly"):SetCheck(self.tPrefs["bRPOnly"])
+	self.wndMain:FindChild("bShowAll"):SetCheck(self.tPrefs["bShowAll"])
+	self.wndMain:FindChild("bFormatChat"):SetCheck(self.tPrefs["bFormat"])
+	self.wndMain:FindChild("bRangeFilter"):SetCheck(self.tPrefs["bRangeFilter"])
+	self.wndMain:FindChild("bUseOcclusion"):SetCheck(self.tPrefs["bUseOcclusion"])
+	-- Custom Chat Colors Mandatory
+	--self.wndMain:FindChild("bCustomChatColors"):SetCheck(self.tPrefs["bCustomChatColors"])
+	self.wndMain:FindChild("bLegacy"):SetCheck(self.tPrefs["bLegacy"])
+	self.tColorBuffer["kstrEmoteColor"] = self.tPrefs["kstrEmoteColor"] 
+	self.tColorBuffer["kstrSayColor"] = self.tPrefs["kstrSayColor"]
+	self.tColorBuffer["kstrOOCColor"] = self.tPrefs["kstrOOCColor"]
+	self.tRFBuffer["nSayRange"] = self.tPrefs["nSayRange"]
+	self.tRFBuffer["nEmoteRange"] = self.tPrefs["nEmoteRange"]
+	self.tRFBuffer["nFalloff"] = self.tPrefs["nFalloff"]
+	self.tBlendBuffer["nICBlend"] = self.tPrefs["nICBlend"]
+	self.tBlendBuffer["nEmoteBlend"] = self.tPrefs["nEmoteBlend"]
+	self.tBlendBuffer["nOOCBlend"] = self.tPrefs["nOOCBlend"]
 	self.bReloadUIRequired = false
 end
 
 function Killroy:OnSetOOCColor( wndHandler, wndControl, eMouseButton )
-	tAddon = Apollo.GetAddon('Killroy')
-	GeminiColor:ShowColorPicker( tAddon, 'OnSetOOCColorOk', true, self.tColorBuffer['kstrOOCColor'])
+	tAddon = Apollo.GetAddon("Killroy")
+	GeminiColor:ShowColorPicker( tAddon, "OnSetOOCColorOk", true, self.tColorBuffer["kstrOOCColor"])
 end
 
 function Killroy:OnSetOOCColorOk(hexcolor)
-	self.tColorBuffer['kstrOOCColor'] = hexcolor
-	self.wndMain:FindChild('setOOCColor'):SetBGColor(hexcolor)
+	self.tColorBuffer["kstrOOCColor"] = hexcolor
+	self.wndMain:FindChild("setOOCColor"):SetBGColor(hexcolor)
 end
 
 function Killroy:OnSetEmoteColor( wndHandler, wndControl, eMouseButton )
-	tAddon = Apollo.GetAddon('Killroy')
-	GeminiColor:ShowColorPicker( tAddon, 'OnSetEmoteColorOk', true, self.tColorBuffer['kstrEmoteColor'])
+	tAddon = Apollo.GetAddon("Killroy")
+	GeminiColor:ShowColorPicker( tAddon, "OnSetEmoteColorOk", true, self.tColorBuffer["kstrEmoteColor"])
 end
 
 function Killroy:OnSetEmoteColorOk(hexcolor)
-	self.tColorBuffer['kstrEmoteColor'] = hexcolor
-	self.wndMain:FindChild('setEmoteColor'):SetBGColor(hexcolor)
+	self.tColorBuffer["kstrEmoteColor"] = hexcolor
+	self.wndMain:FindChild("setEmoteColor"):SetBGColor(hexcolor)
 end
 
 function Killroy:OnSetSayColor( wndHandler, wndControl, eMouseButton )
-	tAddon = Apollo.GetAddon('Killroy')
-	GeminiColor:ShowColorPicker( tAddon, 'OnSetSayColorOk', true, self.tColorBuffer['kstrSayColor'])
+	tAddon = Apollo.GetAddon("Killroy")
+	GeminiColor:ShowColorPicker( tAddon, "OnSetSayColorOk", true, self.tColorBuffer["kstrSayColor"])
 end
 
 function Killroy:OnSetSayColorOk(hexcolor)
-	self.tColorBuffer['kstrSayColor'] = hexcolor
-	self.wndMain:FindChild('setSayColor'):SetBGColor(hexcolor)
+	self.tColorBuffer["kstrSayColor"] = hexcolor
+	self.wndMain:FindChild("setSayColor"):SetBGColor(hexcolor)
 end
 
 function Killroy:OnRangeSlider( wndHandler, wndControl, fNewValue, fOldValue )
@@ -2567,7 +2629,7 @@ end
 function Killroy:Append_OnChannelColorBtn()
 	ChatLog = Apollo.GetAddon("ChatLog")
 	if not ChatLog then return nil end
-	Apollo.RegisterEventHandler('OnChannelColorBtn', OnChannelColorBtn, ChatLog)
+	Apollo.RegisterEventHandler("OnChannelColorBtn", OnChannelColorBtn, ChatLog)
 
 	function ChatLog:OnChannelColorBtn( wndHandler, wndControl, eMouseButton )
 		Killroy = Apollo.GetAddon("Killroy")
@@ -2578,7 +2640,7 @@ function Killroy:Append_OnChannelColorBtn()
 		wndChatType = wndControl:GetParent()
 		nChannel = wndChatType:GetData()
 		
-		GeminiColor:ShowColorPicker( ChatLog, 'OnChannelColorBtnOK', true, Killroy:toHex(self.arChatColor[nChannel]), nChannel, wndControl)
+		GeminiColor:ShowColorPicker( ChatLog, "OnChannelColorBtnOK", true, Killroy:toHex(self.arChatColor[nChannel]), nChannel, wndControl)
 	end
 	
 	function ChatLog:OnChannelColorBtnOK(hexcolor, nChannel, wndControl)
@@ -2633,6 +2695,10 @@ function Killroy:Append_OnRPFilterChanged()
 	end
 end
 
+---------------------------------------------------------------------------------------------------
+-- ChatOptionsForm Functions
+---------------------------------------------------------------------------------------------------
+
 function Killroy:Append_OnFontChange()
 	ChatLog = Apollo.GetAddon("ChatLog")
 	if not ChatLog then return nil end
@@ -2670,12 +2736,6 @@ function Killroy:Append_OnFontChange()
 	end	
 end
 
----------------------------------------------------------------------------------------------------
--- ChatOptionsForm Functions
----------------------------------------------------------------------------------------------------
-
-function Killroy:OnFontChange( wndHandler, wndControl )
-end
 
 -----------------------------------------------------------------------------------------------
 -- Killroy Instance
