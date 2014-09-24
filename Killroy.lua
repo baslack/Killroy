@@ -9,7 +9,7 @@
 *1. RP Filter to a channel specific feature
 2. Save all ChatLog Preferences including window positions
 3. Parse Character Names for a first and last name.
-4. Custom Fonts
+*4. Custom Fonts
 
 ]]--
  
@@ -191,8 +191,6 @@ function Killroy:new(o)
 		}
 	end
 	
-	-- global state for color chat disable reset of ui
-	self.bReloadUIRequired = false
 	-- global state for skipping the next animated emote
 	self.bSkipAnimatedEmote = false
 
@@ -257,7 +255,7 @@ function Killroy:OnDocumentLoaded()
 	self:Change_OnSettings()
 	self.arChatColorTimer = ApolloTimer.Create(2, true, "arChatColor_Check", self)
 	self.ChatLogSettingsTimer = ApolloTimer.Create(2, true, "ChatLogSettings_Check", self)
-	
+	self.KillChatLogSettingsTimer = ApolloTimer.Create(2, true, "KillChatLogSettings_Check", self)
 	--RPChannelSetup
 	if table.maxn(self.arRPChannels) == 0 then
 		self:SetupRPChannels()
@@ -268,6 +266,18 @@ end
 -- Killroy Functions
 -----------------------------------------------------------------------------------------------
 -- Define general functions here
+
+function Killroy:KillChatLogSettings_Check()
+	ChatLog = Apollo.GetAddon("ChatLog")
+	if not ChatLog then return nil end
+	
+	if ChatLog.wndChatOptions then
+		ChatLog.wndChatOptions:Destroy()
+		ChatLog.wndChatOptions = Apollo.LoadForm(self.xmlDoc, "Warning", nil, self)
+		ChatLog.wndChatOptions:Close()
+		self.KillChatLogSettingsTimer:Stop()
+	end
+end
 
 function Killroy:arChatColor_Check()
 	ChatLog = Apollo.GetAddon("ChatLog")
@@ -285,9 +295,9 @@ function Killroy:ChatLogSettings_Check()
 	
 	if next(self.tChatLogPrefs) == nil then
 		self:CaptureChatLogSettings()
-		self.CaptureChatLogSettingsTimer:Stop()
+		self.ChatLogSettingsTimer:Stop()
 	else
-		self:RestoreChatLogPrefs()
+		self:RestoreChatLogSettings()
 		self.ChatLogSettingsTimer:Stop()
 	end
 end
@@ -367,7 +377,7 @@ function Killroy:OnConfigure()
 	self.wndMain:FindChild("bTimestamp"):SetCheck(self.tChatLogPrefs["bShowTimestamp"])
 	self.wndMain:FindChild("bSaveToLog"):SetCheck(self.tChatLogPrefs["bSaveToLog"])
 	self.wndMain:FindChild("bShowChannel"):SetCheck(self.tChatLogPrefs["bShowChannel"])
-	self.wndMain:FindChild("bMouseFade"):SetChecl(self.tChatLogPrefs["bEnableBGFade"])
+	self.wndMain:FindChild("bMouseFade"):SetCheck(self.tChatLogPrefs["bEnableBGFade"])
 	self.wndMain:FindChild("nOpacity"):SetValue(self.tChatLogPrefs["nBGOpacity"])
 	
 	--Font Selected Setup
@@ -378,6 +388,7 @@ function Killroy:OnConfigure()
 		cntrls[this_optn] = self.wndMain:FindChild(this_optn)
 		cntrls[this_optn]:SetText(self.tPrefs[this_optn])
 		cntrls[this_optn]:SetFont(self.tPrefs[this_optn])
+		cntrls[this_optn]:SetData(self.tPrefs[this_optn])
 	end
 			
 	self.wndMain:Show(true)
@@ -439,8 +450,6 @@ function Killroy:OnRestore(eLevel, tData)
 			self.tChatLogPrefs[i] = v
 		end
 	end
-	
-	-- implement override of ChatLog Options from Killroy Save	
 end
 
 ----------------------------
@@ -1077,6 +1086,7 @@ function Killroy:ChannelCludge(sName,nType)
 	local knFudgeCircle = 50
 	local nCludge = 0
 	
+	--[[
 	if self.tPrefs["bCustomChatColors"] then
 		if nType == ChatSystemLib.ChatChannel_Custom then
 			local chan = ChatSystemLib.GetChannels()
@@ -1096,6 +1106,43 @@ function Killroy:ChannelCludge(sName,nType)
 	else
 		return nType
 	end
+	]]--
+	
+		
+	local bIsSociety = nType == ChatSystemLib.ChatChannel_Society
+	local bIsCustom = nType == ChatSystemLib.ChatChannel_Custom
+	
+	if not(bIsCustom or bIsSociety) then
+		return nType
+	else
+		local channels = ChatSystemLib.GetChannels()
+		local societies = {}
+		local customs = {}
+		
+		for i, this_chan in ipairs(channels) do
+			if this_chan:GetType() == ChatSystemLib.ChatChannel_Society then
+				table.insert(societies, this_chan:GetName())
+			elseif this_chan:GetType() == ChatSystemLib.ChatChannel_Custom then
+				table.insert(customs, this_chan:GetName())
+			end
+		end
+		
+		table.sort(societies)
+		table.sort(customs)
+		
+		if bIsSociety then
+			for i, this_society in pairs(societies) do
+				if this_society == sName then return i+knFudgeCircle end
+			end
+		end
+		
+		if bIsCustom then
+			for i, this_custom in pairs(customs) do
+				if this_custom == sName then return i+knFudgeCustom end
+			end
+		end
+	end
+	
 end
 
 function Killroy:Quantize(nFloat)
@@ -1138,6 +1185,16 @@ function Killroy:CaptureChatLogSettings()
 	self.tChatLogPrefs["bEnableNCFade"] = ChatLog.bEnableNCFade
 	self.tChatLogPrefs["nBGOpacity"] = ChatLog.nBGOpacity
 	
+end
+
+function Killroy:RestoreChatLogSettings()
+	self:Override_ChatLog_ProfanityFilter()
+	self:Override_ChatLog_Timestamp()
+	self:Override_ChatLog_ShowChannel()
+	self:Override_ChatLog_SaveToLog()
+	self:Override_ChatLog_Mousefade()
+	self:Override_ChatLog_Opacity()
+	self:Override_ChatLog_Fonts()
 end
 
 function Killroy:Override_ChatLog_ProfanityFilter()
@@ -1227,7 +1284,7 @@ function Killroy:Override_ChatLog_SaveToLog()
 	if not ChatLog then return nil end
 	
 	ChatLog.SaveToLog = self.tChatLogPrefs["bSaveToLog"]
-	Apollo.SetConsoleVariable("chat.saveLog", self.tChatLogPrefs["bSaveToLog"]
+	Apollo.SetConsoleVariable("chat.saveLog", self.tChatLogPrefs["bSaveToLog"])
 end
 
 function Killroy:Change_OnSaveToLog()
@@ -1306,8 +1363,8 @@ function Killroy:Override_ChatLog_Opacity()
 	ChatLog.nBGOpacity = self.tChatLogPrefs["nBGOpacity"]
 	
 	for i, this_wnd in pairs(ChatLog.tChatWindows) do
-		this_wnd:FindChild("BGArt"):SetBGColor(CColor.new(1.0, 1.0, 1.0, ChatLog.nBGOpacity))
-		this_wnd:FindChild("BGArt_SidePanel"):SetBGColor(CColor.new(1.0, 1.0, 1.0, ChatLog.nBGOpacity))
+		this_wnd:FindChild("BGArt"):SetBGColor(CColor.new(1.0, 1.0, 1.0, self.tChatLogPrefs["nBGOpacity"]))
+		this_wnd:FindChild("BGArt_SidePanel"):SetBGColor(CColor.new(1.0, 1.0, 1.0, self.tChatLogPrefs["nBGOpacity"]))
 	end
 end
 
@@ -2526,10 +2583,6 @@ function Killroy:OnOK()
 	self.tPrefs["bFormatChat"] = (self.wndMain:FindChild("bFormatChat"):IsChecked())
 	self.tPrefs["bRangeFilter"] = (self.wndMain:FindChild("bRangeFilter"):IsChecked())
 	self.tPrefs["bUseOcclusion"] = (self.wndMain:FindChild("bUseOcclusion"):IsChecked())
-	
-	--Following line disabled because custom chat colors is mandatory
-	--self.tPrefs["bCustomChatColors"] = (self.wndMain:FindChild("bCustomChatColors"):IsChecked())
-	
 	self.tPrefs["bLegacy"] = (self.wndMain:FindChild("bLegacy"):IsChecked())
 	self.tPrefs["kstrEmoteColor"] = self.tColorBuffer["kstrEmoteColor"]
 	self.tPrefs["kstrSayColor"] = self.tColorBuffer["kstrSayColor"]
@@ -2540,18 +2593,28 @@ function Killroy:OnOK()
 	self.tPrefs["nICBlend"] = self.tBlendBuffer["nICBlend"]
 	self.tPrefs["nEmoteBlend"] = self.tBlendBuffer["nEmoteBlend"]
 	self.tPrefs["nOOCBlend"] = self.tBlendBuffer["nOOCBlend"]
-	--[[
-	code to reloadui has been disabled because custom chat color is now mandatory
-	
-	-- reloadui if custom chat disabled
-	if self.bReloadUIRequired then
-		self.arRPChannels = {}
-		self:SetupRPChannels()
-		self.bReloadUIRequired = false
-		local ComChan = self:GetChannelByName("Command")
-		ComChan:Send("/reloadui")
+	--ChatLog Overrides
+	self.tChatLogPrefs["bProfanityFilter"] = self.wndMain:FindChild("bProfanityFilter"):IsChecked()
+	self:Override_ChatLog_ProfanityFilter()
+	self.tChatLogPrefs["bShowTimestamp"] = self.wndMain:FindChild("bTimestamp"):IsChecked()
+	self:Override_ChatLog_Timestamp()
+	self.tChatLogPrefs["bShowChannel"] = self.wndMain:FindChild("bShowChannel"):IsChecked()
+	self:Override_ChatLog_ShowChannel()
+	self.tChatLogPrefs["bSaveToLog"] = self.wndMain:FindChild("bSaveToLog"):IsChecked()
+	self:Override_ChatLog_SaveToLog()
+	self.tChatLogPrefs["bEnableBGFade"] = self.wndMain:FindChild("bMouseFade"):IsChecked()
+	self.tChatLogPrefs["bEnableNCFade"] = self.wndMain:FindChild("bMouseFade"):IsChecked()
+	self:Override_ChatLog_Mousefade()
+	self.tChatLogPrefs["nBGOpacity"] = self.wndMain:FindChild("nOpacity"):GetValue()
+	self:Override_ChatLog_Opacity()
+	--FontDataUpdate
+	local cntrls = {}
+	local optns = {"strFontOption", "strRPFontOption", "strBubbleFontOption", "strBubbleRPFontOption"}
+	for i, this_optn in pairs(optns) do
+		cntrls[this_optn] = self.wndMain:FindChild(this_optn)
+		cntrls[this_optn]:SetData(self.tPrefs[this_optn])
 	end
-	]]--
+	self:Override_ChatLog_Fonts()
 end
 
 -- when the Cancel button is clicked
@@ -2563,8 +2626,6 @@ function Killroy:OnCancel()
 	self.wndMain:FindChild("bFormatChat"):SetCheck(self.tPrefs["bFormat"])
 	self.wndMain:FindChild("bRangeFilter"):SetCheck(self.tPrefs["bRangeFilter"])
 	self.wndMain:FindChild("bUseOcclusion"):SetCheck(self.tPrefs["bUseOcclusion"])
-	-- Custom Chat Colors Mandatory
-	--self.wndMain:FindChild("bCustomChatColors"):SetCheck(self.tPrefs["bCustomChatColors"])
 	self.wndMain:FindChild("bLegacy"):SetCheck(self.tPrefs["bLegacy"])
 	self.tColorBuffer["kstrEmoteColor"] = self.tPrefs["kstrEmoteColor"] 
 	self.tColorBuffer["kstrSayColor"] = self.tPrefs["kstrSayColor"]
@@ -2575,7 +2636,27 @@ function Killroy:OnCancel()
 	self.tBlendBuffer["nICBlend"] = self.tPrefs["nICBlend"]
 	self.tBlendBuffer["nEmoteBlend"] = self.tPrefs["nEmoteBlend"]
 	self.tBlendBuffer["nOOCBlend"] = self.tPrefs["nOOCBlend"]
-	self.bReloadUIRequired = false
+	--ChatLog Overrides
+	self.wndMain:FindChild("bProfanityFilter"):SetCheck(self.tChatLogPrefs["bProfanityFilter"])
+	self:Override_ChatLog_ProfanityFilter()
+	self.wndMain:FindChild("bTimestamp"):SetCheck(self.tChatLogPrefs["bShowTimestamp"])
+	self:Override_ChatLog_Timestamp()
+	self.wndMain:FindChild("bShowChannel"):SetCheck(self.tChatLogPrefs["bShowChannel"])
+	self:Override_ChatLog_ShowChannel()
+	self.wndMain:FindChild("bSaveToLog"):SetCheck(self.tChatLogPrefs["bSaveToLog"])
+	self:Override_ChatLog_SaveToLog()
+	self.wndMain:FindChild("bMouseFade"):SetCheck(self.tChatLogPrefs["bEnableBGFade"])
+	self:Override_ChatLog_Mousefade()
+	self.wndMain:FindChild("nOpacity"):SetValue(self.tChatLogPrefs["nBGOpacity"])
+	self:Override_ChatLog_Opacity()
+	--FontDataUpdate
+	local cntrls = {}
+	local optns = {"strFontOption", "strRPFontOption", "strBubbleFontOption", "strBubbleRPFontOption"}
+	for i, this_optn in pairs(optns) do
+		cntrls[this_optn] = self.wndMain:FindChild(this_optn)
+		self.tPrefs[this_optn] = cntrls[this_optn]:GetData()
+	end
+	self:Override_ChatLog_Fonts()
 end
 
 function Killroy:OnSetOOCColor( wndHandler, wndControl, eMouseButton )
@@ -2620,6 +2701,56 @@ end
 function Killroy:OnBlendSlider( wndHandler, wndControl, fNewValue, fOldValue )
 	sName = wndControl:GetName()
 	self.tBlendBuffer[sName] = fNewValue
+end
+
+function Killroy:OnFontChange( wndHandler, wndControl )
+
+	local which_font_option = wndControl:GetName()
+	local which_font = ""
+	
+	if not(wndControl:GetSelectedText()) then 
+		which_font = wndControl:GetText()
+	else
+		which_font = wndControl:GetSelectedText()
+	end
+				
+	wndControl:SetFont(which_font)
+	self.tPrefs[which_font_option] = which_font
+
+end
+
+function Killroy:Override_ChatLog_Fonts()
+
+	ChatLog = Apollo.GetAddon("ChatLog")
+	if not ChatLog then return nil end
+	
+	optns = {"strFontOption", "strRPFontOption", "strBubbleFontOption", "strBubbleRPFontOption"}
+	
+	for i, this_optn in pairs(optns) do
+		if this_optn == "strFontOption" then
+			ChatLog.strFontOption = self.tPrefs[this_optn]
+		end
+		
+		if this_optn == "strRPFontOption" then
+			ChatLog.strRPFontOption = self.tPrefs[this_optn]
+		end
+		
+		if this_optn == "strBubbleFontOption" then
+			ChatLog.strBubbleFontOption = self.tPrefs[this_optn]
+		end
+		
+		if this_optn == "strBubbleRPFontOption" then
+			ChatLog.strBubbleRPFontOption = self.tPrefs[this_optn]
+		end
+	end
+end
+
+function Killroy:ToFront( wndHandler, wndControl, x, y )
+	wndControl:SetStyle("IgnoreMouse", false)
+end
+
+function Killroy:ToBack( wndHandler, wndControl, x, y )
+	wndControl:SetStyle("IgnoreMouse", true)
 end
 
 ---------------------------------------------------------------------------------------------------
@@ -2736,6 +2867,14 @@ function Killroy:Append_OnFontChange()
 	end	
 end
 
+
+---------------------------------------------------------------------------------------------------
+-- Warning Functions
+---------------------------------------------------------------------------------------------------
+
+function Killroy:CloseWarning( wndHandler, wndControl, eMouseButton )
+	wndControl:GetParent():Close()
+end
 
 -----------------------------------------------------------------------------------------------
 -- Killroy Instance
