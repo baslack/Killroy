@@ -7,7 +7,7 @@
 1-5 Notes
 
 *1. RP Filter to a channel specific feature
-2. Save all ChatLog Preferences including window positions
+*2. Save all ChatLog Preferences including window positions
 3. Parse Character Names for a first and last name.
 *4. Custom Fonts
 
@@ -223,6 +223,9 @@ function Killroy:OnDocumentLoaded()
 	self.wndMain = Apollo.LoadForm(self.xmlDoc, "KillroyForm", nil, self)
 	self.wndMain:Show(false, true)
 	self:Setup_FontFaces()
+	
+	self.wndWarn = Apollo.LoadForm(self.xmlDoc, "Warning", nil, self)
+	self.wndWarn:Show(false)
 
 	--register commands and actions
 	Apollo.RegisterSlashCommand("killroy", "OnKillroyOn", self)
@@ -255,7 +258,9 @@ function Killroy:OnDocumentLoaded()
 	self:Change_OnSettings()
 	self.arChatColorTimer = ApolloTimer.Create(2, true, "arChatColor_Check", self)
 	self.ChatLogSettingsTimer = ApolloTimer.Create(2, true, "ChatLogSettings_Check", self)
-	self.KillChatLogSettingsTimer = ApolloTimer.Create(2, true, "KillChatLogSettings_Check", self)
+	--self.KillChatLogSettingsTimer = ApolloTimer.Create(2, true, "KillChatLogSettings_Check", self)
+	self:Change_OnConfigure()
+	self:Change_OnWindowMove()
 	--RPChannelSetup
 	if table.maxn(self.arRPChannels) == 0 then
 		self:SetupRPChannels()
@@ -1172,6 +1177,25 @@ end
 -- Killroy Change Methods, these replace ChatLog methods
 --------------------------------------------------------
 
+function Killroy:Change_OnConfigure()
+	ChatLog = Apollo.GetAddon("ChatLog")
+	if not ChatLog then return nil end
+	
+	function ChatLog:OnConfigure()
+		Killroy = Apollo.GetAddon("Killroy")
+		Killroy.wndWarn:Show(not(Killroy.wndWarn:IsShown()))
+	end
+end
+
+function Killroy:Change_OnWindowMove()
+	ChatLog = Apollo.GetAddon("ChatLog")
+	if not ChatLog then return nil end
+	
+	function ChatLog:OnWindowMove( wndHandler, wndControl, nOldLeft, nOldTop, nOldRight, nOldBottom )
+		--Print(string.format("wndHandler: %s, wndControl: %s, Old L T R B: %d, %d, %d, %d", wndHandler:GetName(), wndControl:GetName(), nOldLeft, nOldTop, nOldRight, nOldBottom))
+	end
+end
+
 function Killroy:CaptureChatLogSettings()
 
 	ChatLog = Apollo.GetAddon("ChatLog")
@@ -1320,10 +1344,12 @@ function Killroy:Override_ChatLog_Mousefade()
 	
 	for i, this_chat_wnd in pairs(ChatLog.tChatWindows) do
 		this_chat_wnd:SetStyle("AutoFadeNC", self.tChatLogPrefs["bEnableNCFade"])
-		if self.tChatLogPrefs["bEnableNCFade"] then this_chat_wnd:SetNCOpacity(1) end
+		--if self.tChatLogPrefs["bEnableNCFade"] then this_chat_wnd:SetNCOpacity(1) end
+		this_chat_wnd:SetNCOpacity(1)
 		
 		this_chat_wnd:SetStyle("AutoFadeBG", self.tChatLogPrefs["bEnableBGFade"])
-		if self.tChatLogPrefs["bEnableBGFade"] then this_chat_wnd:SetBGOpacity(1) end
+		--if self.tChatLogPrefs["bEnableBGFade"] then this_chat_wnd:SetBGOpacity(1) end
+		this_chat_wnd:SetBGOpacity(1)
 	end
 end
 
