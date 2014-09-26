@@ -144,7 +144,7 @@ function Killroy:new(o)
 			nEmoteBlend = knDefaultEmoteBlend,
 			nOOCBlend = knDefaultOOCBlend,
 			bLegacy = true,
-			sVersion = "1-5-0",
+			sVersion = "1-5-1",
 			strFontOption = "CRB_Interface12",
 			strRPFontOption = "CRB_Interface12_I",
 			strBubbleFontOption = "CRB_Interface12",
@@ -447,7 +447,7 @@ function Killroy:OnRestore(eLevel, tData)
 		end
 	end
 	
-	self.tPrefs["sVersion"] = "1-5-0"
+	self.tPrefs["sVersion"] = "1-5-1"
 	self.tPrefs["bCustomChatColors"] = true
 	
 	if (tData.tChatLogPrefs ~= nil) then
@@ -632,7 +632,7 @@ function Killroy:Command(...)
 				if mymatch then
 					this_chan = self:GetChannelByName(this_name)
 					nChannel = self:ChannelCludge(this_name, this_chan:GetType())
-					Print(tostring(nChannel))
+					--Print(tostring(nChannel))
 					this_color = ChatLog.arChatColor[nChannel]
 					this_color = self:toHex(this_color)
 					chanSystem:Post(string.format("Killroy: Channel: %s, Color: \"%s\"", this_name, this_color))
@@ -703,7 +703,7 @@ function Killroy:Command(...)
 										nEmoteBlend = knDefaultEmoteBlend,
 										nOOCBlend = knDefaultOOCBlend,
 										bLegacy = true,
-										sVersion = "1-5-0"
+										sVersion = "1-5-1"
 									}
 					chanCommand = self:GetChannelByName("Command")
 					self:SetupRPChannels()
@@ -1062,7 +1062,7 @@ function Killroy:RangeFilter(sMessage, sSender, eChannelType)
 		if eChannelType == ChatSystemLib.ChatChannel_Say then
 			return self:Garble(sMessage, nMinRange, nRange, nMaxRange)
 		elseif eChannelType == ChatSystemLib.ChatChannel_Emote or eChannelType == ChatSystemLib.ChatChannel_AnimatedEmote then
-			return self.Myoptic()
+			return sSender .. self.Myoptic()
 		end
 	elseif nMinRange >= nRange then
 		return sMessage
@@ -2353,13 +2353,13 @@ function Killroy:Change_HelperGenerateChatMessage()
 			--bs:091114 Killroy per channel filter
 			
 			if Killroy.arRPFilterChannels[eChannelType] then
-				Print(string.format("A: %s", tostring(bShow)))
+				--Print(string.format("A: %s", tostring(bShow)))
 				if Killroy.arRPFilterChannels[eChannelType] == enum_NoRP then
 					bShow = not tSegment.bRolePlay
-					Print(string.format("B: %s", tostring(bShow)))
+					--Print(string.format("B: %s", tostring(bShow)))
 				elseif Killroy.arRPFilterChannels[eChannelType] == enum_RPOnly then
 					bShow = tSegment.bRolePlay
-					Print(string.format("C: %s", tostring(bShow)))
+					--Print(string.format("C: %s", tostring(bShow)))
 				else
 					-- assumes enum_ShowAll
 					bShow = true
