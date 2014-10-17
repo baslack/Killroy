@@ -144,7 +144,7 @@ function Killroy:new(o)
 			nEmoteBlend = knDefaultEmoteBlend,
 			nOOCBlend = knDefaultOOCBlend,
 			bLegacy = true,
-			sVersion = "1-5-1",
+			sVersion = "1-5-2",
 			strFontOption = "CRB_Interface12",
 			strRPFontOption = "CRB_Interface12_I",
 			strBubbleFontOption = "CRB_Interface12",
@@ -447,7 +447,7 @@ function Killroy:OnRestore(eLevel, tData)
 		end
 	end
 	
-	self.tPrefs["sVersion"] = "1-5-1"
+	self.tPrefs["sVersion"] = "1-5-2"
 	self.tPrefs["bCustomChatColors"] = true
 	
 	if (tData.tChatLogPrefs ~= nil) then
@@ -645,12 +645,18 @@ function Killroy:Command(...)
 		ChatLog = Apollo.GetAddon("ChatLog")
 		if not ChatLog then return nil end
 		
+		--Print(tostring(sArgs))
 		tArgs = ArgToTable(sArgs)
 		arChannels = ChatSystemLib.GetChannels()
 		arChannelNames = self:GetChannelNames()
 		chanSystem = self:GetChannelByName("System")
 		
 		this_color = ApolloColor.new(tArgs[1])
+		--Print(tostring(tArgs[1]))
+		--for i, this_arg in pairs(tArgs) do
+			--Print(tostring(this_arg))
+		--end
+			
 		if this_color then
 			for i, this_arg in ipairs(tArgs) do
 				for j, this_name in pairs(arChannelNames) do
@@ -703,7 +709,7 @@ function Killroy:Command(...)
 										nEmoteBlend = knDefaultEmoteBlend,
 										nOOCBlend = knDefaultOOCBlend,
 										bLegacy = true,
-										sVersion = "1-5-1"
+										sVersion = "1-5-2"
 									}
 					chanCommand = self:GetChannelByName("Command")
 					self:SetupRPChannels()
@@ -2521,6 +2527,37 @@ function Killroy:Change_OnChatInputReturn()
 						wndInput:SetSel(strSubmitted:len(), -1)
 						return
 					end
+				elseif
+					(channelCurrent:GetType() == ChatSystemLib.ChatChannel_Whisper) or (channelCurrent:GetType() == ChatSystemLib.ChatChannel_AccountWhisper) then
+					local strTargetName
+					local strMessage
+					local i = 0
+					for this_word in string.gmatch(tInput.strMessage, "[^%s]+") do
+						i = i + 1
+						--Print(string.format("%s, %s", this_word, tostring(i)))
+						if i == 1 then strTargetName = this_word
+						elseif i == 2 then strTargetName = strTargetName .. " " .. this_word
+						elseif i == 3 then strMessage = this_word
+						else strMessage = strMessage .. " " .. this_word
+						end
+					end
+					
+					if Killroy.arRPFilterChannels[nCludge] then
+						if Killroy.arRPFilterChannels[nCludge] == enum_RPOnly and Killroy.tPrefs["bRPOnly"] then
+							--tInput.strMessage = Apollo.GetString("ChatLog_RPMarker") .. tInput.strMessage
+							tInput.strMessage = strTargetName .. " " .. Apollo.GetString("ChatLog_RPMarker") .. strMessage
+						elseif Killroy.arRPFilterChannels[nCludge] == enum_ShowAll and Killroy.tPrefs["bShowAll"] then
+							--tInput.strMessage = Apollo.GetString("ChatLog_RPMarker") .. tInput.strMessage
+							tInput.strMessage = strTargetName .. " " .. Apollo.GetString("ChatLog_RPMarker") .. strMessage
+						end
+					else
+						if Killroy.tPrefs["bShowAll"] then
+							--tInput.strMessage = Apollo.GetString("ChatLog_RPMarker") .. tInput.strMessage
+							tInput.strMessage = strTargetName .. " " .. Apollo.GetString("ChatLog_RPMarker") .. strMessage
+						end
+					end	
+					bViewedChannel = self:VerifyChannelVisibility(channelCurrent, tInput, wndForm)
+				
 				else
 					tChatData.channelCurrent = channelCurrent
 					--[[
