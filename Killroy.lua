@@ -144,7 +144,7 @@ function Killroy:new(o)
 			nEmoteBlend = knDefaultEmoteBlend,
 			nOOCBlend = knDefaultOOCBlend,
 			bLegacy = true,
-			sVersion = "1-5-2",
+			sVersion = "1-5-3",
 			strFontOption = "CRB_Interface12",
 			strRPFontOption = "CRB_Interface12_I",
 			strBubbleFontOption = "CRB_Interface12",
@@ -447,7 +447,7 @@ function Killroy:OnRestore(eLevel, tData)
 		end
 	end
 	
-	self.tPrefs["sVersion"] = "1-5-2"
+	self.tPrefs["sVersion"] = "1-5-3"
 	self.tPrefs["bCustomChatColors"] = true
 	
 	if (tData.tChatLogPrefs ~= nil) then
@@ -582,7 +582,7 @@ function Killroy:Command(...)
 		arChannels = ChatSystemLib.GetChannels()
 		arChannelNames = self:GetChannelNames()
 		for i,this_arg in ipairs(ArgToTable(sArgs)) do
-			--/zonePrint(this_arg)
+			--Print(this_arg)
 			--check against channel names
 			for i,this_channel in pairs(arChannelNames) do
 				pattern = ".*"..this_arg..".*"
@@ -709,7 +709,7 @@ function Killroy:Command(...)
 										nEmoteBlend = knDefaultEmoteBlend,
 										nOOCBlend = knDefaultOOCBlend,
 										bLegacy = true,
-										sVersion = "1-5-2"
+										sVersion = "1-5-3"
 									}
 					chanCommand = self:GetChannelByName("Command")
 					self:SetupRPChannels()
@@ -2535,10 +2535,15 @@ function Killroy:Change_OnChatInputReturn()
 					for this_word in string.gmatch(tInput.strMessage, "[^%s]+") do
 						i = i + 1
 						--Print(string.format("%s, %s", this_word, tostring(i)))
-						if i == 1 then strTargetName = this_word
-						elseif i == 2 then strTargetName = strTargetName .. " " .. this_word
-						elseif i == 3 then strMessage = this_word
-						else strMessage = strMessage .. " " .. this_word
+						if channelCurrent:GetType() == ChatSystemLib.ChatChannel_Whipser then
+							if i == 1 then strTargetName = this_word
+							elseif i == 2 then strTargetName = strTargetName .. " " .. this_word
+							elseif i == 3 then strMessage = this_word
+							else strMessage = strMessage .. " " .. this_word end
+						else
+							if i == 1 then strTargetName = this_word
+							elseif i == 2 then strMessage = this_word							
+							else strMessage = strMessage .. " " .. this_word end						
 						end
 					end
 					
@@ -2910,7 +2915,7 @@ function Killroy:Append_OnFontChange()
 					
 		wndControl:SetFont(which_font)
 		
-		Print(string.format("option: %s, font: %s", which_font_option, which_font))
+		--Print(string.format("option: %s, font: %s", which_font_option, which_font))
 		
 		if which_font_option == "strFontOption" then
 			ChatLog.strFontOption = which_font
