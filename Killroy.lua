@@ -144,7 +144,7 @@ function Killroy:new(o)
 			nEmoteBlend = knDefaultEmoteBlend,
 			nOOCBlend = knDefaultOOCBlend,
 			bLegacy = true,
-			sVersion = "1-5-3",
+			sVersion = "1-5-4",
 			strFontOption = "CRB_Interface12",
 			strRPFontOption = "CRB_Interface12_I",
 			strBubbleFontOption = "CRB_Interface12",
@@ -417,7 +417,8 @@ function Killroy:OnSave(eLevel)
 		return {
 				arChatColor = self.arChatColor,
 				arRPChannels = self.arRPChannels,
-				arRPFilterChannels = self.arRPFilterChannels
+				arRPFilterChannels = self.arRPFilterChannels,
+				arViewedChannels = self:ViewedChannelsSave()
 				}
 	else
 		return nil
@@ -446,8 +447,11 @@ function Killroy:OnRestore(eLevel, tData)
 			self.arRPFilterChannels[i] = v
 		end
 	end
+	if (tData.arViewedChannels ~= nil) then
+		self.tViewed = tData.arViewedChannels
+	end
 	
-	self.tPrefs["sVersion"] = "1-5-3"
+	self.tPrefs["sVersion"] = "1-5-4"
 	self.tPrefs["bCustomChatColors"] = true
 	
 	if (tData.tChatLogPrefs ~= nil) then
@@ -675,9 +679,42 @@ function Killroy:Command(...)
 		end
 	end
 	
+	function ToggleAllChannels(strWindow)
+		ChatLog = Apollo.GetAddon("ChatLog")
+		if not ChatLog then return nil end
+		
+		bWndFound = false
+		nFound = 0
+		
+		-- cycle window names for a match if no match do nothing
+		for i, this_wnd in pairs(ChatLog.tChatWindows) do
+			if this_wnd:GetText() == strWindow then 
+				bWndFound = true
+				nFound = i
+			end
+		end
+			
+		if not(bWndFound) then return nil
+		else
+			tData = ChatLog.tChatWindows[nFound]:GetData()
+			
+			channels = ChatSystemLib.GetChannels()
+			for i, this_chan in pairs(channels) do
+				nCludge = self:ChannelCludge(this_chan:GetName(), this_chan:GetType())
+				if tData.tViewedChannels[nCludge] then
+					tData.tViewedChannels[nCludge] = nil
+				else
+					tData.tViewedChannels[nCludge] = true
+				end
+			end
+			
+			ChatLog.tChatWindows[nFound]:SetData(tData)
+		end
+	end
+	
 	function UsageError()
 		chanSystem = self:GetChannelByName("System")
-		chanSystem:Post("Killroy: Usage /kl [flag: -defaults, getclr, setclr, rpon, rpoff, rplist] <channel_name>...") 
+		chanSystem:Post("Killroy: Usage /kl [flag: -defaults, getclr, setclr, rpon, rpoff, rplist, -tgl] <channel_name>...") 
 	end
 	
 	chanSystem = self:GetChannelByName("System")
@@ -709,7 +746,7 @@ function Killroy:Command(...)
 										nEmoteBlend = knDefaultEmoteBlend,
 										nOOCBlend = knDefaultOOCBlend,
 										bLegacy = true,
-										sVersion = "1-5-3"
+										sVersion = "1-5-4"
 									}
 					chanCommand = self:GetChannelByName("Command")
 					self:SetupRPChannels()
@@ -734,6 +771,8 @@ function Killroy:Command(...)
 					for index, this_name in ipairs(tChannelList) do
 						chanSystem:Post(string.format("Killroy: RP Channel, %s",this_name))
 					end
+				elseif sFlag == "-tgl" then
+					ToggleAllChannels(sArgs)
 				else
 					UsageError()
 				end
@@ -1225,6 +1264,34 @@ function Killroy:RestoreChatLogSettings()
 	self:Override_ChatLog_Mousefade()
 	self:Override_ChatLog_Opacity()
 	self:Override_ChatLog_Fonts()
+	if self.tViewed then
+		self:ViewedChannelsRestore(self.tViewed)
+	end
+end
+
+function Killroy:ViewedChannelsSave()
+	ChatLog = Apollo.GetAddon("ChatLog")
+	if not ChatLog then return nil end
+	
+	tViewed = {}
+	
+	for i, this_wnd in pairs(ChatLog.tChatWindows) do
+		this_data = this_wnd:GetData()
+		tViewed[i] = this_data.tViewedChannels
+	end
+	
+	return tViewed
+end
+
+function Killroy:ViewedChannelsRestore(tViewed)
+	ChatLog = Apollo.GetAddon("ChatLog")
+	if not ChatLog then return nil end
+	
+	for i, this_wnd in pairs(ChatLog.tChatWindows) do
+		this_data = this_wnd:GetData()
+		this_data.tViewedChannels = tViewed[i]
+		this_wnd:SetData(this_data)
+	end
 end
 
 function Killroy:Override_ChatLog_ProfanityFilter()
@@ -1889,7 +1956,8 @@ function Killroy:Change_OnViewCheck()
 		end
 
 		if tData.tViewedChannels[channelType] then
-			tData.tViewedChannels[channelType] = nil
+			--tData.tViewedChannels[channelType] = nil
+			tData.tViewedChannels[channelType] = false
 			self:HelperRemoveChannelFromAll(channelType)
 		else
 			tData.tViewedChannels[channelType] = true
