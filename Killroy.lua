@@ -144,7 +144,7 @@ function Killroy:new(o)
 			nEmoteBlend = knDefaultEmoteBlend,
 			nOOCBlend = knDefaultOOCBlend,
 			bLegacy = true,
-			sVersion = "1-5-4",
+			sVersion = "1-5-5",
 			strFontOption = "CRB_Interface12",
 			strRPFontOption = "CRB_Interface12_I",
 			strBubbleFontOption = "CRB_Interface12",
@@ -451,7 +451,7 @@ function Killroy:OnRestore(eLevel, tData)
 		self.tViewed = tData.arViewedChannels
 	end
 	
-	self.tPrefs["sVersion"] = "1-5-4"
+	self.tPrefs["sVersion"] = "1-5-5"
 	self.tPrefs["bCustomChatColors"] = true
 	
 	if (tData.tChatLogPrefs ~= nil) then
@@ -679,36 +679,61 @@ function Killroy:Command(...)
 		end
 	end
 	
-	function ToggleAllChannels(strWindow)
+	function ToggleAllChannels(nOperation, sArgs)
 		ChatLog = Apollo.GetAddon("ChatLog")
 		if not ChatLog then return nil end
 		
-		bWndFound = false
-		nFound = 0
+		enumToggle = 1
+		enumOn = 2 
+		enumOff = 3 
 		
-		-- cycle window names for a match if no match do nothing
-		for i, this_wnd in pairs(ChatLog.tChatWindows) do
-			if this_wnd:GetText() == strWindow then 
-				bWndFound = true
-				nFound = i
+		--determine which windows to work with
+		
+		bWndFound = false
+		tFound = {}
+		tNames = ArgToTable(sArgs)
+		
+		-- for each name
+		for j, this_name in pairs(tNames) do
+			--for each window
+			for i, this_wnd in pairs(ChatLog.tChatWindows) do
+				--check name to window, add to list
+				if this_wnd:GetText() == this_name then 
+					bWndFound = true
+					table.insert(tFound,i)
+				end
 			end
 		end
 			
 		if not(bWndFound) then return nil
 		else
-			tData = ChatLog.tChatWindows[nFound]:GetData()
-			
-			channels = ChatSystemLib.GetChannels()
-			for i, this_chan in pairs(channels) do
-				nCludge = self:ChannelCludge(this_chan:GetName(), this_chan:GetType())
-				if tData.tViewedChannels[nCludge] then
-					tData.tViewedChannels[nCludge] = nil
-				else
-					tData.tViewedChannels[nCludge] = true
+			-- for each window found
+			for i, this_index in ipairs(tFound) do
+				--get the data
+				tData = ChatLog.tChatWindows[this_index]:GetData()
+				--get the channels
+				channels = ChatSystemLib.GetChannels()
+				-- for each channel
+				for i, this_chan in pairs(channels) do
+					--get the cludge index
+					nCludge = self:ChannelCludge(this_chan:GetName(), this_chan:GetType())
+					
+					--perform the operation
+					if nOperation == enumToggle then
+						if tData.tViewedChannels[nCludge] then
+							tData.tViewedChannels[nCludge] = nil
+						else
+							tData.tViewedChannels[nCludge] = true
+						end
+					elseif nOperation == enumOn then
+						tData.tViewedChannels[nCludge] = true
+					elseif nOperation == enumOff then
+						tData.tViewedChannels[nCludge] = nil
+					end
 				end
+				--set the modified data
+				ChatLog.tChatWindows[this_index]:SetData(tData)
 			end
-			
-			ChatLog.tChatWindows[nFound]:SetData(tData)
 		end
 	end
 	
@@ -746,7 +771,7 @@ function Killroy:Command(...)
 										nEmoteBlend = knDefaultEmoteBlend,
 										nOOCBlend = knDefaultOOCBlend,
 										bLegacy = true,
-										sVersion = "1-5-4"
+										sVersion = "1-5-5"
 									}
 					chanCommand = self:GetChannelByName("Command")
 					self:SetupRPChannels()
@@ -772,7 +797,11 @@ function Killroy:Command(...)
 						chanSystem:Post(string.format("Killroy: RP Channel, %s",this_name))
 					end
 				elseif sFlag == "-tgl" then
-					ToggleAllChannels(sArgs)
+					ToggleAllChannels(1, sArgs)
+				elseif sFlag == "-off" then
+					ToggleAllChannels(3, sArgs)
+				elseif sFlag == "-on" then
+					ToggleAllChannels(2, sArgs)
 				else
 					UsageError()
 				end
