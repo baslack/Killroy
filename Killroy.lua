@@ -237,6 +237,9 @@ function Killroy:OnDocumentLoaded()
 	Apollo.RegisterEventHandler("OnICBlend", OnICBlend, self)
 	Apollo.RegisterEventHandler("OnEmoteBlend", OnEmoteBlend, self)
 	Apollo.RegisterEventHandler("OnOOCBlend", OnOOCBlend, self)
+	Apollo.RegisterEventHandler("InterfaceMenuListHasLoaded", "OnInterfaceMenuListHasLoaded", self)
+	Apollo.RegisterEventHandler("ToggleKillroy", "OnKillroyOn", self)
+
 	
 	-- replace ChatLogFunctions
 	self:Change_HelperGenerateChatMessage()
@@ -271,6 +274,11 @@ end
 -- Killroy Functions
 -----------------------------------------------------------------------------------------------
 -- Define general functions here
+
+function Killroy:OnInterfaceMenuListHasLoaded()
+	Event_FireGenericEvent("InterfaceMenuList_NewAddOn", "Killroy", {"ToggleKillroy", "", "KIL:icon"})
+	--self:UpdateInterfaceMenuAlerts()
+end
 
 function Killroy:KillChatLogSettings_Check()
 	ChatLog = Apollo.GetAddon("ChatLog")
@@ -836,16 +844,20 @@ function Killroy:ParseForAnimatedEmote(strText)
 	
 	--dump a table to return
 	local tDump = {}
+	local bSkipAnimatedEmote
 	tDump["strTextClean"] = strTextClean
 	if bValidEmote then
 		tDump["strEmbeddedEmote"] = "/"..strEmbeddedEmote
 		-- this global state is for determining if the next animated emote message needs to be skipped
-		self.bSkipAnimatedEmote = true
+		-- bs: 10.30.14, changed to a passed variable so that it only gets sent
+		--self.bSkipAnimatedEmote = true
+		bSkipAnimatedEmote = true
 	else
 		tDump["strEmbeddedEmote"] = nil
+		bSkipAnimatedEmote = false
 	end
 	
-	return tDump
+	return tDump, bSkipAnimatedEmote
 end
 
 function Killroy:ParseForTarget(strText)
@@ -2035,14 +2047,20 @@ function Killroy:Change_VerifyChannelVisibility()
 			-- filter for targets and embedded emotes before sending to channel
 			local strTargetFiltered = Killroy:ParseForTarget(strMessage)
 			
+			--bs:103114, removed from this method because of switching of send / receive order of animated emote. Left in for reference only.
+			--Remove when confirmed good.
+			
 			-- adding a check for inline emotes to say and emote only
+			
+			--[[
 			local bEmoteOrSay = (nCheckingType == ChatSystemLib.ChatChannel_Emote) or (nCheckingType == ChatSystemLib.ChatChannel_Say)
 			local tEmoteFiltered, strEmbeddedEmote
 			if bEmoteOrSay then
 				tEmoteFiltered = Killroy:ParseForAnimatedEmote(strTargetFiltered)
 				strEmbeddedEmote = tEmoteFiltered["strEmbeddedEmote"]
 			end
-
+			]]--
+			
 			strMessage = strTargetFiltered
 			--break up sends of more than 500 chars
 			if string.len(strMessage)>500 then
@@ -2067,11 +2085,12 @@ function Killroy:Change_VerifyChannelVisibility()
 			else
 			channelChecking:Send(strMessage)
 			end
-			
+			--[[
 			if strEmbeddedEmote then
 				local ComChan = Killroy:GetChannelByName("Command")
 				ComChan:Send(strEmbeddedEmote)
 			end
+			]]--
 			
 			return true
 		else
@@ -2208,16 +2227,25 @@ function Killroy:Change_OnChatMessage()
 		local bKillMessage = false
 		
 		--filter to remove {} from stream, if and only if in Say or Emote
+
 		bEmoteOrSay = bChannelTest1 or bChannelTest2
 		if bEmoteOrSay then
 			for idx, this_segment in ipairs(tQueuedMessage.tMessage.arMessageSegments) do
-				local tFiltered = Killroy:ParseForAnimatedEmote(this_segment.strText)
+				tFiltered, Killroy.bSkipAnimatedEmote = Killroy:ParseForAnimatedEmote(this_segment.strText)
 				this_segment.strText = tFiltered["strTextClean"]
+				-- if this player is the sender, then queue a emote and hide it
+				strAniEmoCached = tFiltered["strEmbeddedEmote"]
+				if not(bPlayerTest) and strAniEmoCached then
+					ComChan = Killroy:GetChannelByName("Command")
+					ComChan:Send(strAniEmoCached)
+				end
 			end
 		end
 		
+		--if eChannelType ~= ChatSystemLib.ChatChannel_Debug then Print("Before Ani Test") end
 		--skip animated emote test
 		if eChannelType == ChatSystemLib.ChatChannel_AnimatedEmote and Killroy.bSkipAnimatedEmote then
+			--if eChannelType ~= ChatSystemLib.ChatChannel_Debug then Print("Inside Ani Test")end
 			Killroy.bSkipAnimatedEmote = false
 			bKillMessage = true
 		end
