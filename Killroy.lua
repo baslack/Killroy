@@ -144,7 +144,7 @@ function Killroy:new(o)
 			nEmoteBlend = knDefaultEmoteBlend,
 			nOOCBlend = knDefaultOOCBlend,
 			bLegacy = true,
-			sVersion = "1-5-5",
+			sVersion = "1-5-7",
 			strFontOption = "CRB_Interface12",
 			strRPFontOption = "CRB_Interface12_I",
 			strBubbleFontOption = "CRB_Interface12",
@@ -276,7 +276,7 @@ end
 -- Define general functions here
 
 function Killroy:OnInterfaceMenuListHasLoaded()
-	Event_FireGenericEvent("InterfaceMenuList_NewAddOn", "Killroy", {"ToggleKillroy", "", "KIL:icon"})
+	Event_FireGenericEvent("InterfaceMenuList_NewAddOn", "Killroy", {"ToggleKillroy", "", "KIL:small_icon"})
 	--self:UpdateInterfaceMenuAlerts()
 end
 
@@ -459,7 +459,7 @@ function Killroy:OnRestore(eLevel, tData)
 		self.tViewed = tData.arViewedChannels
 	end
 	
-	self.tPrefs["sVersion"] = "1-5-5"
+	self.tPrefs["sVersion"] = "1-5-7"
 	self.tPrefs["bCustomChatColors"] = true
 	
 	if (tData.tChatLogPrefs ~= nil) then
@@ -779,7 +779,7 @@ function Killroy:Command(...)
 										nEmoteBlend = knDefaultEmoteBlend,
 										nOOCBlend = knDefaultOOCBlend,
 										bLegacy = true,
-										sVersion = "1-5-5"
+										sVersion = "1-5-7"
 									}
 					chanCommand = self:GetChannelByName("Command")
 					self:SetupRPChannels()
