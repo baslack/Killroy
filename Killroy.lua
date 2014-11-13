@@ -148,7 +148,7 @@ function Killroy:new(o)
 			nEmoteBlend = knDefaultEmoteBlend,
 			nOOCBlend = knDefaultOOCBlend,
 			bLegacy = true,
-			sVersion = "1-5-7",
+			sVersion = "1-5-8",
 			strFontOption = "CRB_Interface12",
 			strRPFontOption = "CRB_Interface12_I",
 			strBubbleFontOption = "CRB_Interface12",
@@ -267,7 +267,8 @@ function Killroy:OnDocumentLoaded()
 	self.ChatLogSettingsTimer = ApolloTimer.Create(2, true, "ChatLogSettings_Check", self)
 	--self.KillChatLogSettingsTimer = ApolloTimer.Create(2, true, "KillChatLogSettings_Check", self)
 	self:Change_OnConfigure()
-	self:Change_OnWindowMove()
+	self:Change_OnChatLineFadeTimer()
+	--self:Change_OnWindowMove()
 	--RPChannelSetup
 	if table.maxn(self.arRPChannels) == 0 then
 		self:SetupRPChannels()
@@ -463,7 +464,7 @@ function Killroy:OnRestore(eLevel, tData)
 		self.tViewed = tData.arViewedChannels
 	end
 	
-	self.tPrefs["sVersion"] = "1-5-7"
+	self.tPrefs["sVersion"] = "1-5-8"
 	self.tPrefs["bCustomChatColors"] = true
 	
 	if (tData.tChatLogPrefs ~= nil) then
@@ -532,6 +533,7 @@ function Killroy:GetRPChannelNames()
 end
 
 function Killroy:IsRPChannel(channel)
+	if not channel then return nil end
 	local sChannelName = channel:GetName()
 	for idx, this_chan in ipairs(self:GetRPChannels()) do
 		if sChannelName == this_chan:GetName() then return true end
@@ -783,7 +785,7 @@ function Killroy:Command(...)
 										nEmoteBlend = knDefaultEmoteBlend,
 										nOOCBlend = knDefaultOOCBlend,
 										bLegacy = true,
-										sVersion = "1-5-7"
+										sVersion = "1-5-8"
 									}
 					chanCommand = self:GetChannelByName("Command")
 					self:SetupRPChannels()
@@ -1267,6 +1269,17 @@ end
 -- Killroy Change Methods, these replace ChatLog methods
 --------------------------------------------------------
 
+function Killroy:Change_OnChatLineFadeTimer()
+
+	ChatLog = Apollo.GetAddon("ChatLog")
+	if not ChatLog then return nil end
+	
+	function ChatLog:OnChatLineFadeTimer()
+		self.timerFade:Stop()
+		return
+	end
+end
+
 function Killroy:Change_OnConfigure()
 	ChatLog = Apollo.GetAddon("ChatLog")
 	if not ChatLog then return nil end
@@ -1632,18 +1645,21 @@ function Killroy:Change_HelperRemoveChannelFromInputWindow()
 			local tChatData = wnd:GetData()
 			local nCludge = Killroy:ChannelCludge(tChatData.channelCurrent:GetName(),tChatData.channelCurrent:GetType())
 			--if tChatData.channelCurrent:GetType() == channelRemoved then
-			if nCludge == channelRemoved then
-			
+			--1-5-7, KL
+			--if nCludge == channelRemoved then
+			--1-5-8, KL
+			if tChatData.channelCurrent:GetUniqueId() == channelRemoved then
+						
 				local channelNew = self:HelperFindAViewedChannel()
-				local wndInputType = wnd:FindChild("InputType")
+				local wndInput = wnd:FindChild("Input")
 	
 				if channelNew ~= nil then
 					tChatData.channelCurrent = channelNew
-					wndInputType:SetText(tChatData.channelCurrent:GetCommand())
+					wndInput:SetPrompt(tChatData.channelCurrent:GetCommand())
 					--tChatData.crText = self.arChatColor[tChatData.channelCurrent:GetType()]
 					tChatData.crText = self.arChatColor[nCludge]
 
-					wndInputType:SetTextColor(tChatData.crText)
+					wndInput:SetPromptColor(tChatData.crText)
 	
 					--TODO: Helper this since we do it other places
 					local wndInput = wnd:FindChild("Input")
@@ -1655,10 +1671,10 @@ function Killroy:Change_HelperRemoveChannelFromInputWindow()
 					end
 	
 					if strText == "" then
-						strText =String_GetWeaselString(Apollo.GetString("ChatLog_SlashPrefix"),  strCommand)
+						strText =String_GetWeaselString(Apollo.GetString("ChatLog_SlashPrefix"), strCommand.." ")
 					else
 						local tInput = ChatSystemLib.SplitInput(strText) -- get the existing message, ignore the old command
-						strText = String_GetWeaselString(Apollo.GetString("ChatLog_MessageToPlayer"), strCommand, tInput.strMessage)
+						strText = String_GetWeaselString(Apollo.GetString("ChatLog_MessageToPlayer"), strCommand).." "..tInput.strMessage
 					end
 	
 					wndInput:SetText(strText)
@@ -1669,8 +1685,8 @@ function Killroy:Change_HelperRemoveChannelFromInputWindow()
 					wndInput:SetSel(strText:len(), -1)
 	
 				else
-					wndInputType:SetText("X")
-					wndInputType:SetTextColor(kcrInvalidColor)
+					wndInput:SetPrompt("X")
+					wndInput:SetPromptColor(kcrInvalidColor)
 				end
 			end
 		end
@@ -1698,21 +1714,20 @@ function Killroy:Change_OnInputMenuEntry()
 		end
 	
 		if strText == "" then
-			strText = String_GetWeaselString(Apollo.GetString("ChatLog_SlashPrefix"), strCommand)
+			strText = String_GetWeaselString(Apollo.GetString("ChatLog_SlashPrefix"), strCommand.." ")
 		else
 			local tInput = ChatSystemLib.SplitInput(strText) -- get the existing message, ignore the old command
-			strText = String_GetWeaselString(Apollo.GetString("ChatLog_SlashPrefix"), strCommand, tInput.strMessage)
+			strText = String_GetWeaselString(Apollo.GetString("ChatLog_SlashPrefix"), strCommand).." "..tInput.strMessage
 		end
+
 	
 		wndInput:SetText(strText)
 		--local crText = self.arChatColor[channelCurrent:GetType()] or ApolloColor.new("white")
 		local crText = self.arChatColor[Killroy:ChannelCludge(channelCurrent:GetName(),channelCurrent:GetType())] or ApolloColor.new("white")
-		local wndInputType = wndChat:FindChild("InputType")
 		wndInput:SetTextColor(crText)
-		wndInputType:SetText(channelCurrent:GetCommand())
-		wndInputType:SetTextColor(crText)
-		wndInputType:Show(string.len(strText) == 0)
-	
+
+		wndInput:SetPrompt(channelCurrent:GetCommand())
+		wndInput:SetPromptColor(crText)
 		wndInput:SetFocus()
 		wndInput:SetSel(strText:len(), -1)
 	
@@ -1753,9 +1768,10 @@ function Killroy:Change_BuildInputTypeMenu()
 		for idx, channelCurrent in pairs(tChannels) do -- gives us our viewed channels
 			--if tData.tViewedChannels[ channelCurrent:GetType() ] ~= nil then
 			--bs070414, Cludge abbr.
-			local nCludge = Killroy:ChannelCludge(channelCurrent:GetName(),channelCurrent:GetType())
-			--if self.tAllViewedChannels[ channelCurrent:GetType() ] ~= nil then, disabled bs070414
-			if self.tAllViewedChannels[nCludge] ~= nil then
+			--1-5-7, KL Disable for Unique ID, Carbine
+			--local nCludge = Killroy:ChannelCludge(channelCurrent:GetName(),channelCurrent:GetType())
+			--if self.tAllViewedChannels[nCludge] ~= nil then
+			if self.tAllViewedChannels[channelCurrent:GetUniqueId()] ~= nil then
 				if channelCurrent:GetCommand() ~= nil and channelCurrent:GetCommand() ~= "" then -- make sure it"s a channelCurrent that can be spoken into
 					local strCommand = channelCurrent:GetAbbreviation()
 	
@@ -2011,7 +2027,9 @@ function Killroy:Change_OnViewCheck()
 		
 		local wndOptions = wndChannel:GetParent():GetParent():GetParent()
 		
-		local channelType = wndChannel:GetData()
+		local tTypeData = wndChannel:GetData()
+		
+		local eChannelId = tTypeData["nId"]
 		
 		local tData = wndOptions:GetData()
 
@@ -2019,13 +2037,12 @@ function Killroy:Change_OnViewCheck()
 			return
 		end
 
-		if tData.tViewedChannels[channelType] then
-			--tData.tViewedChannels[channelType] = nil
-			tData.tViewedChannels[channelType] = false
-			self:HelperRemoveChannelFromAll(channelType)
+		if tData.tViewedChannels[eChannelId] then
+			tData.tViewedChannels[eChannelId] = false
+			self:HelperRemoveChannelFromAll(eChannelId)
 		else
-			tData.tViewedChannels[channelType] = true
-			self:HelperAddChannelToAll(channelType)
+			tData.tViewedChannels[eChannelId] = true
+			self:HelperAddChannelToAll(eChannelId)
 		end
 	end
 end
@@ -2177,12 +2194,15 @@ function Killroy:Change_AddChannelTypeToList()
 		--insert a cludge her for channel type 18, so that it gets spread out into multple ids in the chat log
 		
 		local nCludge = Killroy:ChannelCludge(channel:GetName(), channel:GetType())
+		local nId = channel:GetUniqueId()
+		local tTypeData = {}
+		tTypeData["nCludge"],tTypeData["nId"] = nCludge, nId
 		local wndChannelItem = Apollo.LoadForm(Killroy.xmlDoc, "ChatType", wndList, self)
 		wndChannelItem:FindChild("TypeName"):SetText(channel:GetName())
 		--wndChannelItem:SetData(channel:GetType())
-		wndChannelItem:SetData(nCludge)
+		wndChannelItem:SetData(tTypeData)
 		--wndChannelItem:FindChild("ViewCheck"):SetCheck(tData.tViewedChannels[channel:GetType()] or false)
-		wndChannelItem:FindChild("ViewCheck"):SetCheck(tData.tViewedChannels[nCludge] or false)
+		wndChannelItem:FindChild("ViewCheck"):SetCheck(tData.tViewedChannels[nId] or false)
 		
 		local CCB = wndChannelItem:FindChild("ChannelColorBtn")
 		if self.arChatColor[nCludge] then
@@ -2379,19 +2399,23 @@ function Killroy:Change_HelperGenerateChatMessage()
 		end
 
 		local xml = XmlDoc.new()
-		local tm = GameLib.GetLocalTime()
+
 		--local crText = self.arChatColor[eChannelType] or ApolloColor.new("white")
 		local crText = self.arChatColor[eChannelType] or ApolloColor.new("white")
 		--local crChannel = ApolloColor.new(karChannelTypeToColor[eChannelType].Channel or "white")
 		local crChannel = self.arChatColor[eChannelType] or ApolloColor.new("white")
 		local crPlayerName = ApolloColor.new("ChatPlayerName")
+		local strTime = ""
+		if self.bShowTimestamp then
+			strTime = self:HelperGetTimeStr()
+		end
 
-		local strTime = "" if self.bShowTimestamp then strTime = string.format("%d:%02d ", tm.nHour, tm.nMinute) end
 		local strWhisperName = tMessage.strSender
-		if tMessage.strRealmName:len() > 0 then
+		if tMessage.strRealmName:len() > 0 and eChannelType ~= ChatSystemLib.ChatChannel_AccountWhisper then
 			-- Name/Realm formatting needs to be very specific for cross realm chat to work
 			strWhisperName = strWhisperName .. "@" .. tMessage.strRealmName
 		end
+		local strDisplayName = strWhisperName
 
 		--strWhisperName must only be sender@realm, or friends equivelent name.
 
@@ -2411,6 +2435,7 @@ function Killroy:Change_HelperGenerateChatMessage()
 				self.tLastWhisperer = { strCharacterName = strWhisperName, eChannelType = ChatSystemLib.ChatChannel_Whisper }--record the last incoming whisperer for quick response
 			end
 			Sound.Play(Sound.PlayUISocialWhisper)
+			self:InsertIntoRecent(strWhisperName, false)
 		elseif eChannelType == ChatSystemLib.ChatChannel_AccountWhisper then
 
 			local tPreviousWhisperer = self.tLastWhisperer
@@ -2432,16 +2457,13 @@ function Killroy:Change_HelperGenerateChatMessage()
 								self.tLastWhisperer.strDisplayName = tAccountFriend.strCharacterName
 								self.tLastWhisperer.strRealmName = tCharacter.strRealm
 							end
-							strWhisperName = tAccountFriend.strCharacterName
-							if tMessage.strRealmName:len() > 0 then
-								-- Name/Realm formatting needs to be very specific for cross realm chat to work
-								strWhisperName = strWhisperName .. "@" .. tMessage.strRealmName
-							end
+							strDisplayName = tAccountFriend.strCharacterName						
 						end
 					end
 				end
 			end
 			Sound.Play(Sound.PlayUISocialWhisper)
+			self:InsertIntoRecent(strWhisperName, true)
 		end
 
 		-- inserting an abort of the chat line for the filter
@@ -2494,7 +2516,7 @@ function Killroy:Change_HelperGenerateChatMessage()
 			end
 
 			xml:AddLine(strTime .. strChannel, crChannel, self.strFontOption, "Left")
-			if strWhisperName:len() > 0 then
+			if strDisplayName:len() > 0 then
 
 				local strWhisperNamePrefix = ""
 				if eChannelType == ChatSystemLib.ChatChannel_Whisper or eChannelType == ChatSystemLib.ChatChannel_AccountWhisper then
@@ -2511,8 +2533,9 @@ function Killroy:Change_HelperGenerateChatMessage()
 					xml:AppendImage(kstrGMIcon, 16, 16)
 				end
 
-				xml:AppendText( strWhisperName, crPlayerName, self.strFontOption, {CharacterName=strWhisperName, nReportId=tMessage.nReportId}, "Source")
-			end
+				local strCross = tMessage.bCrossFaction and "true" or "false"--has to be a string or a number due to code restriction
+				xml:AppendText( strDisplayName, crPlayerName, self.strFontOption, {strCharacterName = strWhisperName, nReportId = tMessage.nReportId , strCrossFaction = strCross}, "Source")
+	end
 			xml:AppendText( strPresenceState .. ": ", crChannel, self.strFontOption, "Left")
 		end
 
@@ -2619,11 +2642,17 @@ function Killroy:Change_HelperGenerateChatMessage()
 						parsedText = Killroy:ParseForContext(strText, eChannelType)
 						Killroy:DumpToChat(parsedText, eChannelType, strChatFont, xml)
 					elseif Killroy.tPrefs["bFormatChat"] and (eChannelType == ChatSystemLib.ChatChannel_AnimatedEmote) then
-						xml:AppendText(strText, Killroy.tPrefs["kstrEmoteColor"], strChatFont)
+						local strCross = tMessage.bCrossFaction and "true" or "false"--has to be a string or a number due to code restriction
+						--xml:AppendText(strText, Killroy.tPrefs["kstrEmoteColor"], strChatFont)
+						xml:AppendText(strText, Killroy.tPrefs["kstrEmoteColor"], strChatFont, {strCharacterName = strWhisperName, nReportId = tMessage.nReportId, strCrossFaction = strCross}, "Source")
 					else
-						xml:AppendText(strText, crChatText, strChatFont)
+						if eChannelType == ChatSystemLib.ChatChannel_AnimatedEmote then
+							local strCross = tMessage.bCrossFaction and "true" or "false"--has to be a string or a number due to code restriction
+							xml:AppendText(strText, crChatText, strChatFont, {strCharacterName = strWhisperName, nReportId = tMessage.nReportId, strCrossFaction = strCross}, "Source")
+						else
+							xml:AppendText(strText, crChatText, strChatFont)
+						end
 					end
-
 				else
 					local strLinkIndex = tostring( self:HelperSaveLink(tLink) )
 					-- append text can only save strings as attributes.
@@ -3037,7 +3066,7 @@ function Killroy:Append_OnChannelColorBtn()
 		local GeminiColor = Apollo.GetPackage("GeminiColor").tPackage
 		
 		wndChatType = wndControl:GetParent()
-		nChannel = wndChatType:GetData()
+		nChannel = wndChatType:GetData()["nCludge"]
 		
 		GeminiColor:ShowColorPicker( ChatLog, "OnChannelColorBtnOK", true, Killroy:toHex(self.arChatColor[nChannel]), nChannel, wndControl)
 	end
@@ -3059,7 +3088,7 @@ function Killroy:Append_OnRPChannel()
 		
 		-- Get the channel number embedded in the form
 		wndChatType = wndControl:GetParent()
-		nChannel = wndChatType:GetData()
+		nChannel = wndChatType:GetData()["nCludge"]
 		
 		-- Get the channel, then use the Killroy method to set it
 		RPChannel = Killroy:GetChannelByNumber(nChannel)
@@ -3078,7 +3107,7 @@ function Killroy:Append_OnRPFilterChanged()
 		if not Killroy then return nil end
 		
 		wndChatType = wndControl:GetParent()
-		nChannel = wndChatType:GetData()
+		nChannel = wndChatType:GetData()["nCludge"]
 		
 		local enum_NoRP = 1
 		local enum_RPOnly = 2
