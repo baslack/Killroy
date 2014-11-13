@@ -730,19 +730,23 @@ function Killroy:Command(...)
 				-- for each channel
 				for i, this_chan in pairs(channels) do
 					--get the cludge index
-					nCludge = self:ChannelCludge(this_chan:GetName(), this_chan:GetType())
+					--1-5-7
+					--nCludge = self:ChannelCludge(this_chan:GetName(), this_chan:GetType())
+					--1-5-8
+					nId = this_chan:GetUniqueId()
+					
 					
 					--perform the operation
 					if nOperation == enumToggle then
-						if tData.tViewedChannels[nCludge] then
-							tData.tViewedChannels[nCludge] = nil
+						if tData.tViewedChannels[nId] then
+							tData.tViewedChannels[nId] = nil
 						else
-							tData.tViewedChannels[nCludge] = true
+							tData.tViewedChannels[nId] = true
 						end
 					elseif nOperation == enumOn then
-						tData.tViewedChannels[nCludge] = true
+						tData.tViewedChannels[nId] = true
 					elseif nOperation == enumOff then
-						tData.tViewedChannels[nCludge] = nil
+						tData.tViewedChannels[nId] = nil
 					end
 				end
 				--set the modified data
@@ -1345,6 +1349,29 @@ function Killroy:ViewedChannelsRestore(tViewed)
 	ChatLog = Apollo.GetAddon("ChatLog")
 	if not ChatLog then return nil end
 	
+	--map old id to new id
+	tCatch = {}
+	for i, tThis_View in pairs(tViewed) do
+		tCatch[i] = {}
+		for j, this_nCludge in pairs(tThis_View) do
+			if tonumber(j) <= 100 then
+				--figure out the new id
+				--add the new id to the table
+				local chan = self:GetChannelByNumber(tonumber(j))
+				if chan then
+					local id = chan:GetUniqueId()
+					tCatch[i][id] = true
+				else
+					--Print (string.format("Unknown Channel: %d",tonumber(j)))
+				end
+			else
+				tCatch[i][j] = true
+			end
+		end
+	end
+	
+	tViewed = tCatch	
+	
 	for i, this_wnd in pairs(ChatLog.tChatWindows) do
 		this_data = this_wnd:GetData()
 		this_data.tViewedChannels = tViewed[i]
@@ -1769,7 +1796,7 @@ function Killroy:Change_BuildInputTypeMenu()
 			--if tData.tViewedChannels[ channelCurrent:GetType() ] ~= nil then
 			--bs070414, Cludge abbr.
 			--1-5-7, KL Disable for Unique ID, Carbine
-			--local nCludge = Killroy:ChannelCludge(channelCurrent:GetName(),channelCurrent:GetType())
+			local nCludge = Killroy:ChannelCludge(channelCurrent:GetName(),channelCurrent:GetType())
 			--if self.tAllViewedChannels[nCludge] ~= nil then
 			if self.tAllViewedChannels[channelCurrent:GetUniqueId()] ~= nil then
 				if channelCurrent:GetCommand() ~= nil and channelCurrent:GetCommand() ~= "" then -- make sure it"s a channelCurrent that can be spoken into
@@ -1838,7 +1865,7 @@ function Killroy:Change_OnInputChanged()
 		local wndForm = wndControl:GetParent()
 		local wndInput = wndForm:FindChild("Input")
 	
-		if if Apollo.StringToLower(strText) == Apollo.GetString("ChatLog_Reply") and self.tLastWhisperer and self.tLastWhisperer.strCharacterName ~= "" then
+		if Apollo.StringToLower(strText) == Apollo.GetString("ChatLog_Reply") and self.tLastWhisperer and self.tLastWhisperer.strCharacterName ~= "" then
 			local strName = self.tLastWhisperer.strCharacterName
 			local channel = self.channelWhisper
 			if self.tLastWhisperer.eChannelType == ChatSystemLib.ChatChannel_AccountWhisper then
@@ -2070,7 +2097,7 @@ function Killroy:Change_VerifyChannelVisibility()
 		]]--
 		
 		--1-5-8, new id parameter
-		nTestChannelType = self.tAllViewedChannels[channelChecking:GetUniqueID()]
+		nTestChannelType = self.tAllViewedChannels[channelChecking:GetUniqueId()]
 		
 		if nTestChannelType ~= nil then -- see if this channelChecking is viewed
 			local strMessage = tInput.strMessage
