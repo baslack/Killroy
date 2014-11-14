@@ -148,7 +148,7 @@ function Killroy:new(o)
 			nEmoteBlend = knDefaultEmoteBlend,
 			nOOCBlend = knDefaultOOCBlend,
 			bLegacy = true,
-			sVersion = "1-5-8",
+			sVersion = "1-5-9",
 			strFontOption = "CRB_Interface12",
 			strRPFontOption = "CRB_Interface12_I",
 			strBubbleFontOption = "CRB_Interface12",
@@ -464,7 +464,7 @@ function Killroy:OnRestore(eLevel, tData)
 		self.tViewed = tData.arViewedChannels
 	end
 	
-	self.tPrefs["sVersion"] = "1-5-8"
+	self.tPrefs["sVersion"] = "1-5-9"
 	self.tPrefs["bCustomChatColors"] = true
 	
 	if (tData.tChatLogPrefs ~= nil) then
@@ -789,7 +789,7 @@ function Killroy:Command(...)
 										nEmoteBlend = knDefaultEmoteBlend,
 										nOOCBlend = knDefaultOOCBlend,
 										bLegacy = true,
-										sVersion = "1-5-8"
+										sVersion = "1-5-9"
 									}
 					chanCommand = self:GetChannelByName("Command")
 					self:SetupRPChannels()
@@ -1350,20 +1350,17 @@ function Killroy:ViewedChannelsRestore(tViewed)
 	if not ChatLog then return nil end
 	
 	--map old id to new id
+	--[[
 	tCatch = {}
 	for i, tThis_View in pairs(tViewed) do
 		tCatch[i] = {}
 		for j, this_nCludge in pairs(tThis_View) do
-			if tonumber(j) <= 100 then
-				--figure out the new id
-				--add the new id to the table
-				local chan = self:GetChannelByNumber(tonumber(j))
-				if chan then
-					local id = chan:GetUniqueId()
-					tCatch[i][id] = true
-				else
-					--Print (string.format("Unknown Channel: %d",tonumber(j)))
-				end
+			if type(j) == "number" then
+				local chan = self:GetChannelByNumber(j)
+				local id = chan:GetUniqueId()
+				tCatch[i][id] = true
+				tCatch[i][j] = nil
+				Print(string.format("Channel: %s, #: %d, id: %s", chan:GetName(), j, id))
 			else
 				tCatch[i][j] = true
 			end
@@ -1371,7 +1368,7 @@ function Killroy:ViewedChannelsRestore(tViewed)
 	end
 	
 	tViewed = tCatch	
-	
+	]]--
 	for i, this_wnd in pairs(ChatLog.tChatWindows) do
 		this_data = this_wnd:GetData()
 		this_data.tViewedChannels = tViewed[i]
@@ -2386,6 +2383,12 @@ function Killroy:Change_OnChatMessage()
 					self.bQueuedMessages = true
 					wndChat:GetData().tMessageQueue:Push(tQueuedMessage)
 				end
+			end
+			]]--
+			
+			--[[
+			if tQueuedMessage.eChannelType ~= ChatSystemLib.ChatChannel_Debug then
+				Print(string.format("Passed Id: %s",tQueuedMessage.idChannel))
 			end
 			]]--
 			self:HelperQueueMessage(tQueuedMessage)
