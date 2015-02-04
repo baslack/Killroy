@@ -3,16 +3,6 @@
 -- Open Source Licensing granted by Benjamin A. Slack, feel free to use, change or extend.
 -----------------------------------------------------------------------------------------------
 
---[[
-1-5 Notes
-
-*1. RP Filter to a channel specific feature
-*2. Save all ChatLog Preferences including window positions
-3. Parse Character Names for a first and last name.
-*4. Custom Fonts
-
-]]--
- 
 require "Apollo"
 require "Window"
 require "Unit"
@@ -148,7 +138,7 @@ function Killroy:new(o)
 			nEmoteBlend = knDefaultEmoteBlend,
 			nOOCBlend = knDefaultOOCBlend,
 			bLegacy = true,
-			sVersion = "1-5-10",
+			sVersion = "1-5-12",
 			strFontOption = "CRB_Interface12",
 			strRPFontOption = "CRB_Interface12_I",
 			strBubbleFontOption = "CRB_Interface12",
@@ -278,7 +268,7 @@ end
 -- Define general functions here
 
 function Killroy:OnInterfaceMenuListHasLoaded()
-	Event_FireGenericEvent("InterfaceMenuList_New=AddOn", "Killroy", {"ToggleKillroy", "", "KIL:small_icon"})
+	Event_FireGenericEvent("InterfaceMenuList_NewAddOn", "Killroy", {"ToggleKillroy", "", "KIL:small_icon"})
 end
 
 function Killroy:KillChatLogSettings_Check()
@@ -460,7 +450,7 @@ function Killroy:OnRestore(eLevel, tData)
 		self.tViewed = tData.arViewedChannels
 	end
 	
-	self.tPrefs["sVersion"] = "1-5-10"
+	self.tPrefs["sVersion"] = "1-5-12"
 	self.tPrefs["bCustomChatColors"] = true
 	
 	if (tData.tChatLogPrefs ~= nil) then
@@ -772,7 +762,7 @@ function Killroy:Command(...)
 										nEmoteBlend = knDefaultEmoteBlend,
 										nOOCBlend = knDefaultOOCBlend,
 										bLegacy = true,
-										sVersion = "1-5-10"
+										sVersion = "1-5-12"
 									}
 					chanCommand = self:GetChannelByName("Command")
 					self:SetupRPChannels()
@@ -1429,7 +1419,9 @@ function Killroy:Change_OnBGFade()
 			ChatLog.bEnableBGFade = false
 			ChatLog.bEnableNCFade = false
 		end
-	
+
+		local nCurrentGameTime = GameLib.GetGameTime()
+			
 		for idx, wndChatWindow in pairs(self.tChatWindows) do
 			wndChatWindow:SetStyle("AutoFadeNC", ChatLog.bEnableNCFade)
 			if ChatLog.bEnableNCFade then wndChatWindow:SetNCOpacity(1) end
@@ -1865,7 +1857,7 @@ function Killroy:Change_NewChatWindow()
 		local wndChatChild = wndChatWindow:FindChild("Chat")
 		for idx = 1, self.nMaxChatLines do
 			local wndChatLine = Apollo.LoadForm(self.xmlDoc, "ChatLine", wndChatChild, self)
-			wndChatLine:SetData({ ["nLine"]=idx, ["nAddedTime"]=GameLib.GetGameTime() })
+			wndChatLine:SetData({ ["nLine"]=idx, ["nAddedTime"]=knTimeToFade, ["bFading"]=false })
 			wndChatLine:Show(false)
 			tChatData.tChildren:Push(wndChatLine)
 		end
@@ -2215,7 +2207,24 @@ function Killroy:Change_OnChatMessage()
 					end
 				end
 			end	
-		end	
+		end
+		
+		--kill message if on per channel filtering
+		local enum_NoRP = 1
+		local enum_RPOnly = 2
+		local enum_ShowAll = 3
+		local bRolePlay = false
+		
+		for idx, tSegment in ipairs( tQueuedMessage.tMessage.arMessageSegments ) do
+			if tSegment.bRolePlay then
+				bRolePlay = true
+			end
+		end
+		
+		if Killroy.arRPFilterChannels[eChannelType] then
+			if Killroy.arRPFilterChannels[eChannelType] == enum_NoRP and bRolePlay then bKillMessage = true end
+			if Killroy.arRPFilterChannels[eChannelType] == enum_RPOnly and not bRolePlay then bKillMessage = true end
+		end		
 						
 		if not bKillMessage then
 			-- handle unit bubble if needed.
@@ -2328,18 +2337,7 @@ function Killroy:Change_HelperGenerateChatMessage()
 			self:InsertIntoRecent(strWhisperName, true)
 		end
 
-		local bRolePlay = false
-		for idx, tSegment in ipairs( tMessage.arMessageSegments ) do
-			if tSegment.bRolePlay then
-				bRolePlay = true
-			end
-		end
-		
-		if Killroy.arRPFilterChannels[eChannelType] then
-			if Killroy.arRPFilterChannels[eChannelType] == enum_NoRP and bRolePlay then return end
-			if Killroy.arRPFilterChannels[eChannelType] == enum_RPOnly and not bRolePlay then return end
-		end
-	
+
 		-- We build strings backwards, right to left
 		if eChannelType == ChatSystemLib.ChatChannel_AnimatedEmote then -- emote animated channel gets special formatting
 			if Killroy.tPrefs["bFormatChat"] then
@@ -2407,6 +2405,9 @@ function Killroy:Change_HelperGenerateChatMessage()
 		for idx, tSegment in ipairs( tMessage.arMessageSegments ) do
 			local strText = tSegment.strText
 			local bAlien = tSegment.bAlien or (tMessage.bCrossFaction and not(Killroy.tPrefs["bCrossFaction"]))
+
+			--bs:02.01.2015, 1-5-12, moved dump code for RP filter to OnChatMessage to prevent it from being sent.
+			--[[
 			local bShow = false
 
 			--bs:091114 Killroy per channel filter
@@ -2424,7 +2425,10 @@ function Killroy:Change_HelperGenerateChatMessage()
 				bShow = true
 			end
 			-- end Killroy per channel filter code
-
+			]]--
+			
+			local bShow = true
+			
 			if bShow then
 				local crChatText = crText;
 				local crBubbleText = kstrColorChatRegular
@@ -2543,12 +2547,11 @@ function Killroy:Change_OnChatInputReturn()
 			end
 			
 			wndControl:SetText("")
-			
 			local tChatData = wndForm:GetData()
 			local bViewedChannel = true
 			local tInput = ChatSystemLib.SplitInput(strText)
+			
 			if strText ~= "" and strText ~= Apollo.GetString("ChatLog_RPMarker") and strText ~= Apollo.GetString("ChatLog_Marker") then
-
 				local channelCurrent = tInput.channelCommand or tChatData.channelCurrent
 				self.channelLastChannel = channelCurrent
 				
@@ -2574,14 +2577,13 @@ function Killroy:Change_OnChatInputReturn()
 						wndInput:SetSel(strSubmitted:len(), -1)
 						return
 					end
-				elseif
-					(channelCurrent:GetType() == ChatSystemLib.ChatChannel_Whisper) or (channelCurrent:GetType() == ChatSystemLib.ChatChannel_AccountWhisper) then
+				elseif (channelCurrent:GetType() == ChatSystemLib.ChatChannel_Whisper) or (channelCurrent:GetType() == ChatSystemLib.ChatChannel_AccountWhisper) then
 					local strTargetName
 					local strMessage
 					local i = 0
 					for this_word in string.gmatch(tInput.strMessage, "[^%s]+") do
 						i = i + 1
-						if channelCurrent:GetType() == ChatSystemLib.ChatChannel_Whipser then
+						if (channelCurrent:GetType() == ChatSystemLib.ChatChannel_Whisper) then
 							if i == 1 then strTargetName = this_word
 							elseif i == 2 then strTargetName = strTargetName .. " " .. this_word
 							elseif i == 3 then strMessage = this_word
@@ -2589,7 +2591,7 @@ function Killroy:Change_OnChatInputReturn()
 						else
 							if i == 1 then strTargetName = this_word
 							elseif i == 2 then strMessage = this_word							
-							else strMessage = strMessage .. " " .. this_word end						
+							else strMessage = strMessage .. " " .. this_word end
 						end
 					end
 					
@@ -2603,7 +2605,8 @@ function Killroy:Change_OnChatInputReturn()
 						if Killroy.tPrefs["bShowAll"] then
 							tInput.strMessage = strTargetName .. " " .. Apollo.GetString("ChatLog_RPMarker") .. strMessage
 						end
-					end	
+					end
+					
 					bViewedChannel = self:VerifyChannelVisibility(channelCurrent, tInput, wndForm)
 				
 				else
@@ -2650,6 +2653,8 @@ function Killroy:Change_OnChatInputReturn()
 				wndInput:SetTextColor(kcrInvalidColor)
 				wndInput:SetPrompt("X " .. tInput.strCommand)
 			end
+			
+			self:ChatActionTaken(wndControl:GetParent())			
 		end
 	end
 end
