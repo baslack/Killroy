@@ -28,6 +28,7 @@ local GeminiColor
 local kcrInvalidColor = ApolloColor.new("InvalidChat")
 local kcrValidColor = ApolloColor.new("white")
 
+local knCountSpaces = 2
 local kstrColorChatRegular = "ff7fffb9"
 local kstrColorChatShout = "ffd9eef7"
 local kstrColorChatRoleplay = "ff58e3b0"
@@ -43,6 +44,7 @@ local knChannelListHeight = 500
 local knSaveVersion = 8
 local knMaxRecentEntries = 10
 local kMaxShownEntries = 4
+
 
 local karEvalColors =
 {
@@ -138,7 +140,7 @@ function Killroy:new(o)
 			nEmoteBlend = knDefaultEmoteBlend,
 			nOOCBlend = knDefaultOOCBlend,
 			bLegacy = true,
-			sVersion = "1-5-12",
+			sVersion = "1-5-13",
 			strFontOption = "CRB_Interface12",
 			strRPFontOption = "CRB_Interface12_I",
 			strBubbleFontOption = "CRB_Interface12",
@@ -257,6 +259,7 @@ function Killroy:OnDocumentLoaded()
 	self.ChatLogSettingsTimer = ApolloTimer.Create(2, true, "ChatLogSettings_Check", self)
 	self:Change_OnConfigure()
 	self:Change_OnChatLineFadeTimer()
+	self:Change_OnSuggestedMenuResult()
 	if table.maxn(self.arRPChannels) == 0 then
 		self:SetupRPChannels()
 	end
@@ -383,6 +386,8 @@ function Killroy:OnConfigure()
 	self.wndMain:FindChild("bShowChannel"):SetCheck(self.tChatLogPrefs["bShowChannel"])
 	self.wndMain:FindChild("bMouseFade"):SetCheck(self.tChatLogPrefs["bEnableBGFade"])
 	self.wndMain:FindChild("nOpacity"):SetValue(self.tChatLogPrefs["nBGOpacity"])
+	self.wndMain:FindChild("bPCBubbles"):SetCheck(self.tChatLogPrefs["bPCBubbles"])
+	self.wndMain:FindChild("bNPCBubbles"):SetCheck(self.tChatLogPrefs["bNPCBubbles"])
 	
 	--Font Selected Setup
 	local cntrls = {}
@@ -450,7 +455,7 @@ function Killroy:OnRestore(eLevel, tData)
 		self.tViewed = tData.arViewedChannels
 	end
 	
-	self.tPrefs["sVersion"] = "1-5-12"
+	self.tPrefs["sVersion"] = "1-5-13"
 	self.tPrefs["bCustomChatColors"] = true
 	
 	if (tData.tChatLogPrefs ~= nil) then
@@ -762,7 +767,7 @@ function Killroy:Command(...)
 										nEmoteBlend = knDefaultEmoteBlend,
 										nOOCBlend = knDefaultOOCBlend,
 										bLegacy = true,
-										sVersion = "1-5-12"
+										sVersion = "1-5-13"
 									}
 					chanCommand = self:GetChannelByName("Command")
 					self:SetupRPChannels()
@@ -1208,6 +1213,49 @@ end
 -- Killroy Change Methods, these replace ChatLog methods
 --------------------------------------------------------
 
+function Killroy:Change_OnSuggestedMenuResult()
+	ChatLog = Apollo.GetAddon("ChatLog")
+	if not ChatLog then return nil end
+
+	function ChatLog:OnSuggestedMenuResult(tInfo, nTextBoxId)
+		Killroy = Apollo.GetAddon("Killroy")
+		if not Killroy then return nil end
+		
+		local wndEdit = self:HelperGetCurrentEditbox()
+		if not wndEdit or nTextBoxId ~= wndEdit:GetId() or not tInfo then
+			return
+		end
+	
+		--this section will auto correct the channel if it was a communication command, otherwise use original.
+		local tInput = ChatSystemLib.SplitInput(wndEdit:GetText())
+		local strCommand = ""
+		local strExtraSpace = " "
+		local eChannelType = nil
+		if tInput and tInput.channelCommand ~= self.channelAccountWhisper and tInput.channelCommand  ~= self.channelWhisper then
+			strCommand 	  = tInput.strCommand
+			eChannelType  = tInput.channelCommand:GetType()
+			bExtraSpace   = false
+			strExtraSpace = ""
+		elseif tInfo.bAccountFriends then
+			strCommand    = self.channelAccountWhisper:GetAbbreviation()
+			eChannelType  = ChatSystemLib.ChatChannel_AccountWhisper
+		else
+			strCommand    = self.channelWhisper:GetAbbreviation()
+			eChannelType  = ChatSystemLib.ChatChannel_Whisper
+		end
+	
+		local strOutput = "/"..strCommand.." "..tInfo.strCharacterName..strExtraSpace
+		wndEdit:SetText(strOutput)
+		
+		--02.04.15, Appending Cludge Code for correct coloring of channel prompt
+		--local eChannelColorType = eChannelType or tInput and tInput.channelCommand:GetType()
+		local eChannelColorType = eChannelType or tInput and Killroy:ChannelCludge(tInput.channelCommand:GetName(), tInput.channelCommand:GetType())
+		wndEdit:SetTextColor(self.arChatColor[eChannelColorType] or ApolloColor.new("white"))
+		wndEdit:SetFocus()
+		wndEdit:SetSel(strOutput:len(), -1)
+	end
+end
+
 function Killroy:Change_OnChatLineFadeTimer()
 
 	ChatLog = Apollo.GetAddon("ChatLog")
@@ -1249,6 +1297,8 @@ function Killroy:CaptureChatLogSettings()
 	self.tChatLogPrefs["bEnableBGFade"] = ChatLog.bEnableBGFade
 	self.tChatLogPrefs["bEnableNCFade"] = ChatLog.bEnableNCFade
 	self.tChatLogPrefs["nBGOpacity"] = ChatLog.nBGOpacity
+	self.tChatLogPrefs["bPCBubbles"] = ChatLog.bEnablePlayerBubbles
+	self.tChatLogPrefs["bNPCBubbles"] = ChatLog.bEnableNPCBubbles
 	
 end
 
@@ -1260,6 +1310,7 @@ function Killroy:RestoreChatLogSettings()
 	self:Override_ChatLog_Mousefade()
 	self:Override_ChatLog_Opacity()
 	self:Override_ChatLog_Fonts()
+	self:Override_ChatLog_Bubbles()
 	if self.tViewed then
 		self:ViewedChannelsRestore(self.tViewed)
 	end
@@ -1441,6 +1492,7 @@ function Killroy:Override_ChatLog_Opacity()
 	for i, this_wnd in pairs(ChatLog.tChatWindows) do
 		this_wnd:FindChild("BGArt"):SetBGColor(CColor.new(1.0, 1.0, 1.0, self.tChatLogPrefs["nBGOpacity"]))
 		this_wnd:FindChild("BGArt_SidePanel"):SetBGColor(CColor.new(1.0, 1.0, 1.0, self.tChatLogPrefs["nBGOpacity"]))
+		this_wnd:FindChild("BGArt_ResizeHandle"):SetBGColor(CColor.new(1.0, 1.0, 1.0, self.tChatLogPrefs["nBGOpacity"]))
 	end
 end
 
@@ -1458,6 +1510,20 @@ function Killroy:Change_OnBGDrawSlider()
 	end
 end
 
+function Killroy:Override_ChatLog_Bubbles()
+	ChatLog = Apollo.GetAddon("ChatLog")
+	if not ChatLog then return nil end
+	
+	if self.tChatLogPrefs["bPCBubbles"] then
+		ChatLog.bEnablePlayerBubbles = self.tChatLogPrefs["bPCBubbles"]		
+		Apollo.SetConsoleVariable("unit.playerTextBubbleEnabled", self.tChatLogPrefs["bPCBubbles"])
+	end
+	
+	if self.tChatLogPrefs["bNPCBubbles"] then
+		ChatLog.bEnableNPCBubbles = self.tChatLogPrefs["bNPCBubbles"]
+		Apollo.SetConsoleVariable("unit.npcTextBubbleEnabled", self.tChatLogPrefs["bNPCBubbles"])
+	end
+end
 
 function Killroy:Change_OnSettings()
 	ChatLog = Apollo.GetAddon("ChatLog")
@@ -1799,22 +1865,32 @@ function Killroy:Change_OnInputChanged()
 			end
 		end
 		
-		--1-5-8, KL, Added Carbine Menu Code
-		local wndSuggestedMenu = wndForm:FindChild("SuggestedMenu")
-		if wndSuggestedMenu:IsShown() then
-			local tInput = ChatSystemLib.SplitInput(strText)
-			local nIndexOfSpace = string.find(tInput.strMessage, "%s")
-			if nIndexOfSpace and not self.strLastText then --tInput.strMessage may not have a space
-				self.strLastText = string.sub(tInput.strMessage, 0, nIndexOfSpace - 1)
-			elseif not nIndexOfSpace then
-				self.strLastText = tInput.strMessage
+		--02.04.15, Carbine changed their helper window code entirely
+		local luaSubclass = wndInput:GetWindowSubclass()
+		if luaSubclass and tInput then
+			if not self.tSuggestedFilterRules then
+				self.tSuggestedFilterRules = self:HelperLoadSetRules(luaSubclass)
 			end
-			if self.strLastText ~= "" then
-				self:OnShowSuggestedMenu(wndInput:GetParent():FindChild("SuggestedMenu") , true)
-			else
-				wndSuggestedMenu:Show(false)
+	
+			if tInput.bValidCommand then
+				strCommandName = tInput.channelCommand and tInput.channelCommand:GetCommand() ~= "" and tInput.channelCommand:GetCommand() or tInput.strCommand
 			end
-		end		
+	
+			if strCommandName ~= "" then
+				local strLowerCaseCommand = Apollo.StringToLower(strCommandName)
+				if self.tSuggestedFilterRules and self.tSuggestedFilterRules[strLowerCaseCommand] then
+					local strPlaceHolder, nCountSpaces = string.gsub(strText, " ", " ")
+					if tInput.bValidCommand and nCountSpaces <= knCountSpaces then
+						local tSuggestFilterInfo = self.tSuggestedFilterRules[strLowerCaseCommand]
+						self.tLastFilteredInfo = tSuggestFilterInfo
+						luaSubclass:SetFilters(tSuggestFilterInfo)
+						luaSubclass:OnEditBoxChanged(wndHandler, wndControl, tInput.strMessage)
+					elseif tInput.bValidCommand and nCountSpaces > knCountSpaces or not tInput.bValidCommand and luaSubclass:IsSuggestedMenuShown() then
+						luaSubclass:HideSuggestedMenu()
+					end
+				end
+			end
+		end
 	end
 
 end	
@@ -1836,13 +1912,14 @@ function Killroy:Change_NewChatWindow()
 		wndChatWindow:SetStyle("AutoFadeBG", self.bEnableBGFade)
 		wndChatWindow:FindChild("BGArt"):SetBGColor(CColor.new(1.0, 1.0, 1.0, self.nBGOpacity))
 		wndChatWindow:FindChild("BGArt_SidePanel"):SetBGColor(CColor.new(1.0, 1.0, 1.0, self.nBGOpacity))
+		wndChatWindow:FindChild("BGArt_ResizeHandle"):SetBGColor(CColor.new(1.0, 1.0, 1.0, self.nBGOpacity))
+		
 		wndChatWindow:SetText(strTitle)
 		wndChatWindow:Show(true)
 		wndChatWindow:FindChild("InputTypeBtn"):AttachWindow(wndChatWindow:FindChild("InputWindow"))
 		wndChatWindow:FindChild("EmoteBtn"):AttachWindow(wndChatWindow:FindChild("EmoteMenu"))
 		wndChatWindow:FindChild("Options"):AttachWindow(wndChatWindow:FindChild("OptionsSubForm"))
 		wndChatWindow:FindChild("OptionsSubForm"):SetData(wndChatWindow)
-		wndChatWindow:FindChild("SuggestedMenu"):Show(false)	
 		
 		--Store the initial input window size
 		self.nInputMenuLeft, self.nInputMenuTop, self.nInputMenuRight, self.nInputMenuBottom = wndChatWindow:FindChild("InputWindow"):GetAnchorOffsets()
@@ -2334,7 +2411,7 @@ function Killroy:Change_HelperGenerateChatMessage()
 				end
 			end
 			Sound.Play(Sound.PlayUISocialWhisper)
-			self:InsertIntoRecent(strWhisperName, true)
+			self:InsertIntoRecent(strDisplayName, true)
 		end
 
 
@@ -2362,7 +2439,7 @@ function Killroy:Change_HelperGenerateChatMessage()
 		else
 			local strChannel
 			if eChannelType == ChatSystemLib.ChatChannel_Society then
-				strChannel = String_GetWeaselString(Apollo.GetString("ChatLog_GuildCommand"), tQueuedMessage.strChannelName, tQueuedMessage.strChannelCommand)
+				strChannel = (string.format("%s ", String_GetWeaselString(Apollo.GetString("ChatLog_GuildCommand"), tQueuedMessage.strChannelName, tQueuedMessage.strChannelCommand))) --String DB removed empty characters at the end of string, so have to hardcode it here.
 			else
 				strChannel = String_GetWeaselString(Apollo.GetString("CRB_Brackets_Space"), tQueuedMessage.strChannelName)
 			end
@@ -2392,7 +2469,7 @@ function Killroy:Change_HelperGenerateChatMessage()
 				local strCross = tMessage.bCrossFaction and "true" or "false"--has to be a string or a number due to code restriction
 				xml:AppendText( strDisplayName, crPlayerName, self.strFontOption, {strCharacterName = strWhisperName, nReportId = tMessage.nReportId , strCrossFaction = strCross}, "Source")
 	end
-			xml:AppendText( strPresenceState .. ": ", crChannel, self.strFontOption, "Left")
+			xml:AppendText( strPresenceState .. Apollo.GetString("Chat_ColonBreak"), crChannel, self.strFontOption, "Left")
 		end
 
 		local xmlBubble = nil
@@ -2541,8 +2618,9 @@ function Killroy:Change_OnChatInputReturn()
 
 			local wndInput = wndForm:FindChild("Input")
 			
-			if wndInput:GetParent():FindChild("SuggestedMenu"):IsShown() and self.tResultBtns and self.tResultBtns[self.nSuggestedResultPos] then --select the suggested name
-				self:OnSuggestedMenuEntry(self.tResultBtns[self.nSuggestedResultPos], self.tResultBtns[self.nSuggestedResultPos])
+			local luaSubclass = wndControl:GetWindowSubclass()
+			if luaSubclass and luaSubclass:IsSuggestedMenuShown() then
+				luaSubclass:OnEditBoxReturn(wndHandler, wndControl)
 				return
 			end
 			
@@ -2724,6 +2802,9 @@ function Killroy:OnOK()
 	self:Override_ChatLog_Mousefade()
 	self.tChatLogPrefs["nBGOpacity"] = self.wndMain:FindChild("nOpacity"):GetValue()
 	self:Override_ChatLog_Opacity()
+	self.tChatLogPrefs["bPCBubbles"] = self.wndMain:FindChild("bPCBubbles"):IsChecked()
+	self.tChatLogPrefs["bNPCBubbles"] = self.wndMain:FindChild("bNPCBubbles"):IsChecked()
+	self:Override_ChatLog_Bubbles()
 	--FontDataUpdate
 	local cntrls = {}
 	local optns = {"strFontOption", "strRPFontOption", "strBubbleFontOption", "strBubbleRPFontOption"}
@@ -2766,6 +2847,9 @@ function Killroy:OnCancel()
 	self:Override_ChatLog_Mousefade()
 	self.wndMain:FindChild("nOpacity"):SetValue(self.tChatLogPrefs["nBGOpacity"])
 	self:Override_ChatLog_Opacity()
+	self.wndMain:FindChild("bPCBubbles"):SetCheck(self.tChatLogPrefs["bPCBubbles"])
+	self.wndMain:FindChild("bNPCBubbles"):SetCheck(self.tChatLogPrefs["bNPCBubbles"])
+	self:Override_ChatLog_Bubbles()
 	--FontDataUpdate
 	local cntrls = {}
 	local optns = {"strFontOption", "strRPFontOption", "strBubbleFontOption", "strBubbleRPFontOption"}
