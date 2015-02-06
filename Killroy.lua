@@ -140,7 +140,7 @@ function Killroy:new(o)
 			nEmoteBlend = knDefaultEmoteBlend,
 			nOOCBlend = knDefaultOOCBlend,
 			bLegacy = true,
-			sVersion = "1-5-13",
+			sVersion = "1-5-14",
 			strFontOption = "CRB_Interface12",
 			strRPFontOption = "CRB_Interface12_I",
 			strBubbleFontOption = "CRB_Interface12",
@@ -238,6 +238,7 @@ function Killroy:OnDocumentLoaded()
 
 	
 	-- replace ChatLogFunctions
+	self:Change_OnChatJoin()
 	self:Change_HelperGenerateChatMessage()
 	self:Change_OnChatInputReturn()
 	self:Change_OnRoleplayBtn()
@@ -257,6 +258,7 @@ function Killroy:OnDocumentLoaded()
 	self:Change_OnSettings()
 	self.arChatColorTimer = ApolloTimer.Create(2, true, "arChatColor_Check", self)
 	self.ChatLogSettingsTimer = ApolloTimer.Create(2, true, "ChatLogSettings_Check", self)
+	self.ChatWindowsTimer = ApolloTimer.Create(2, true, "ChatWindows_Cleanup", self)
 	self:Change_OnConfigure()
 	self:Change_OnChatLineFadeTimer()
 	self:Change_OnSuggestedMenuResult()
@@ -270,8 +272,72 @@ end
 -----------------------------------------------------------------------------------------------
 -- Define general functions here
 
+function Killroy:DumpIDs()
+	local result = {}
+	tChannels = ChatSystemLib.GetChannels()
+	for i, this_chan in pairs(tChannels) do
+		result[this_chan:GetName()] = this_chan:GetUniqueId()
+		--Print(string.format("Name: %s, ID:%d", this_chan:GetName(), this_chan:GetUniqueId())
+	end
+	return result
+end
+
 function Killroy:OnInterfaceMenuListHasLoaded()
 	Event_FireGenericEvent("InterfaceMenuList_NewAddOn", "Killroy", {"ToggleKillroy", "", "KIL:small_icon"})
+end
+
+function Killroy:ChatWindows_Cleanup()
+	-- this function runs at the startup of Killroy after the ChatWindows in ChatLog have come online.
+	-- it should eliminate any Unique ID entries, replacing them with ChannelCludges
+	
+	ChatLog = Apollo.GetAddon("ChatLog")
+	if not ChatLog then return nil end
+	
+	if ChatLog.tChatWindows then
+
+		tChannels = ChatSystemLib.GetChannels()
+		
+		for i, this_wnd in ipairs(ChatLog.tChatWindows) do -- for each window
+			tData = this_wnd:GetData() --get the windows data
+			tViewed = tData.tViewedChannels --rename the viewed channels for convenience
+			for j, this_chan in ipairs(tChannels) do --for each channel
+				if tViewed[this_chan:GetUniqueId()] then --check if the channel is viewed by Unique Id
+					tViewed[this_chan:GetUniqueId()] = nil -- eliminate Unique ID Entry
+					tViewed[Killroy:ChannelCludge(this_chan:GetName(), this_chan:GetType())] = true --Add Channel Cludge Entry
+				end
+			end
+			for index, this_viewed in pairs(tViewed) do --for each index in the viewed channels
+				bKillIndex = true --assume the entry is bad
+				for j, this_chan in ipairs(tChannels) do -- for each channel
+					if index == Killroy:ChannelCludge(this_chan:GetName(), this_chan:GetType()) then --check the index to the channel's cludge
+						bKillIndex = false --if it matches, mark the index as a keeper
+					end
+				end
+				if bKillIndex then tViewed[index] = nil end -- if its not marked, remove it
+			end
+			this_wnd:SetData(tData) --now that it's been cleaned, write it back to the window data
+		end
+
+		-- Clean ChatLog Master List
+		for j, this_chan in ipairs(tChannels) do --for each channel
+			if ChatLog.tAllViewedChannels[this_chan:GetUniqueId()] then --check if the channel is viewed by Unique Id
+				ChatLog.tAllViewedChannels[this_chan:GetUniqueId()] = nil -- eliminate Unique ID Entry
+				ChatLog.tAllViewedChannels[Killroy:ChannelCludge(this_chan:GetName(), this_chan:GetType())] = true --Add Channel Cludge Entry
+			end
+		end				
+		for index, this_viewed in pairs(ChatLog.tAllViewedChannels) do --have to do the master channel list as well
+				for j, this_chan in ipairs(tChannels) do -- for each channel
+					if index == Killroy:ChannelCludge(this_chan:GetName(), this_chan:GetType()) then --check the index to the channel's cludge
+						bKillIndex = false --if it matches, mark the index as a keeper
+					end
+				end
+				if bKillIndex then ChatLog.tAllViewedChannels[index] = nil end -- if its not marked, remove it		
+		end
+		
+		self.ChatWindowsTimer:Stop()
+	else
+		return nil
+	end
 end
 
 function Killroy:KillChatLogSettings_Check()
@@ -455,7 +521,7 @@ function Killroy:OnRestore(eLevel, tData)
 		self.tViewed = tData.arViewedChannels
 	end
 	
-	self.tPrefs["sVersion"] = "1-5-13"
+	self.tPrefs["sVersion"] = "1-5-14"
 	self.tPrefs["bCustomChatColors"] = true
 	
 	if (tData.tChatLogPrefs ~= nil) then
@@ -711,8 +777,9 @@ function Killroy:Command(...)
 				channels = ChatSystemLib.GetChannels()
 				-- for each channel
 				for i, this_chan in pairs(channels) do
-					--1-5-8
-					nId = this_chan:GetUniqueId()
+					--02.05.15, Carbine broke Get Unique ID
+					--nId = this_chan:GetUniqueId()
+					nId = Killroy:ChannelCludge(this_chan:GetName(), this_chan:GetType())
 					
 					
 					--perform the operation
@@ -767,7 +834,7 @@ function Killroy:Command(...)
 										nEmoteBlend = knDefaultEmoteBlend,
 										nOOCBlend = knDefaultOOCBlend,
 										bLegacy = true,
-										sVersion = "1-5-13"
+										sVersion = "1-5-14"
 									}
 					chanCommand = self:GetChannelByName("Command")
 					self:SetupRPChannels()
@@ -1277,14 +1344,6 @@ function Killroy:Change_OnConfigure()
 	end
 end
 
-function Killroy:Change_OnWindowMove()
-	ChatLog = Apollo.GetAddon("ChatLog")
-	if not ChatLog then return nil end
-	
-	function ChatLog:OnWindowMove( wndHandler, wndControl, nOldLeft, nOldTop, nOldRight, nOldBottom )
-	end
-end
-
 function Killroy:CaptureChatLogSettings()
 
 	ChatLog = Apollo.GetAddon("ChatLog")
@@ -1352,26 +1411,6 @@ function Killroy:Override_ChatLog_ProfanityFilter()
 	Apollo.SetConsoleVariable("chat.filter", self.tChatLogPrefs["bProfanityFilter"])
 end
 
-function Killroy:Change_OnProfanityFilter()
-
-	ChatLog = Apollo.GetAddon("ChatLog")
-	if not ChatLog then return nil end
-
-	function ChatLog:OnProfanityFilter(wndHandler, wndControl)
-		if wndHandler == wndControl then
-			if string.find(wndControl:GetName(), ".*On.*") then
-				ChatLog.bProfanityFilter = true
-			else
-				ChatLog.bProfanityFilter = false
-			end
-			for idx, channelCurrent in ipairs(ChatSystemLib.GetChannels()) do
-				channelCurrent:SetProfanity(self.bProfanityFilter)
-			end
-			Apollo.SetConsoleVariable("chat.filter", ChatLog.bProfanityFilter)
-		end
-	end
-end
-
 function Killroy:Override_ChatLog_Timestamp()
 
 	ChatLog = Apollo.GetAddon("ChatLog")
@@ -1381,21 +1420,6 @@ function Killroy:Override_ChatLog_Timestamp()
 
 end
 
-function Killroy:Change_OnTimestamp()
-	ChatLog = Apollo.GetAddon("ChatLog")
-	if not ChatLog then return nil end
-	
-	function ChatLog:OnTimestamp(wndHandler, wndControl)
-		--self.bShowTimestamp = wndControl:GetData()
-		if string.find(wndControl:GetName(), ".*On.*") then
-			ChatLog.bShowTimestamp = true
-		else
-			ChatLog.bShowTimestamp = false
-		end
-	end
-end
-
-
 function Killroy:Override_ChatLog_ShowChannel()
 	ChatLog = Apollo.GetAddon("ChatLog")
 	if not ChatLog then return nil end
@@ -1403,18 +1427,6 @@ function Killroy:Override_ChatLog_ShowChannel()
 	ChatLog.bShowChannel = self.tChatLogPrefs["bShowChannel"]
 end
 
-function Killroy:Change_OnChannelLabel()
-	ChatLog = Apollo.GetAddon("ChatLog")
-	if not ChatLog then return nil end
-	
-	function ChatLog:OnChannelLabel(wndHandler, wndControl)
-		if string.find(wndControl:GetName(), ".*Off.*") then
-			ChatLog.bShowChannel = false
-		else
-			ChatLog.bShowChannel = true
-		end
-	end
-end
 
 function Killroy:Override_ChatLog_SaveToLog()
 
@@ -1423,21 +1435,6 @@ function Killroy:Override_ChatLog_SaveToLog()
 	
 	ChatLog.SaveToLog = self.tChatLogPrefs["bSaveToLog"]
 	Apollo.SetConsoleVariable("chat.saveLog", self.tChatLogPrefs["bSaveToLog"])
-end
-
-function Killroy:Change_OnSaveToLog()
-	ChatLog = Apollo.GetAddon("ChatLog")
-	if not ChatLog then return nil end
-	
-	function ChatLog:OnSaveToLog(wndHandler, wndControl)
-		if string.find(wndControl:GetName(), ".*On.*") then 
-			ChatLog.bSaveToLog = true
-			Apollo.SetConsoleVariable("chat.saveLog", true)
-		else
-			ChatLog.bSaveToLog = false
-			Apollo.SetConsoleVariable("chat.saveLog", false)
-		end
-	end
 end
 
 function Killroy:Override_ChatLog_Mousefade()
@@ -1457,32 +1454,6 @@ function Killroy:Override_ChatLog_Mousefade()
 	end
 end
 
-function Killroy:Change_OnBGFade()
-	ChatLog = Apollo.GetAddon("ChatLog")
-	if not ChatLog then return nil end
-	
-	function ChatLog:OnBGFade(wndHandler, wndControl)
-
-		if string.find(wndControl:GetName(), ".*Enable.*") then
-			ChatLog.bEnableBGFade = true
-			ChatLog.bEnableNCFade = true
-		else
-			ChatLog.bEnableBGFade = false
-			ChatLog.bEnableNCFade = false
-		end
-
-		local nCurrentGameTime = GameLib.GetGameTime()
-			
-		for idx, wndChatWindow in pairs(self.tChatWindows) do
-			wndChatWindow:SetStyle("AutoFadeNC", ChatLog.bEnableNCFade)
-			if ChatLog.bEnableNCFade then wndChatWindow:SetNCOpacity(1) end
-	
-			wndChatWindow:SetStyle("AutoFadeBG", ChatLog.bEnableBGFade)
-			if ChatLog.bEnableBGFade then wndChatWindow:SetBGOpacity(1) end
-		end
-	end
-end
-
 function Killroy:Override_ChatLog_Opacity()
 	ChatLog = Apollo.GetAddon("ChatLog")
 	if not ChatLog then return nil end
@@ -1493,20 +1464,6 @@ function Killroy:Override_ChatLog_Opacity()
 		this_wnd:FindChild("BGArt"):SetBGColor(CColor.new(1.0, 1.0, 1.0, self.tChatLogPrefs["nBGOpacity"]))
 		this_wnd:FindChild("BGArt_SidePanel"):SetBGColor(CColor.new(1.0, 1.0, 1.0, self.tChatLogPrefs["nBGOpacity"]))
 		this_wnd:FindChild("BGArt_ResizeHandle"):SetBGColor(CColor.new(1.0, 1.0, 1.0, self.tChatLogPrefs["nBGOpacity"]))
-	end
-end
-
-function Killroy:Change_OnBGDrawSlider()
-	ChatLog = Apollo.GetAddon("ChatLog")
-	if not ChatLog then return nil end
-	
-	function ChatLog:OnBGDrawSlider(wndHandler, wndControl)
-		ChatLog.nBGOpacity = wndControl:GetValue()
-	
-		for idx, wndChatWindow in pairs(self.tChatWindows) do
-			wndChatWindow:FindChild("BGArt"):SetBGColor(CColor.new(1.0, 1.0, 1.0, ChatLog.nBGOpacity))
-			wndChatWindow:FindChild("BGArt_SidePanel"):SetBGColor(CColor.new(1.0, 1.0, 1.0, ChatLog.nBGOpacity))
-		end
 	end
 end
 
@@ -1626,8 +1583,9 @@ function Killroy:Change_HelperRemoveChannelFromInputWindow()
 		for idx, wnd in pairs(self.tChatWindows) do
 			local tChatData = wnd:GetData()
 			local nCludge = Killroy:ChannelCludge(tChatData.channelCurrent:GetName(),tChatData.channelCurrent:GetType())
-			--1-5-8, KL
-			if tChatData.channelCurrent:GetUniqueId() == channelRemoved then
+			--02.05.15, Carbine broke Unique ID, replacing with nCludge
+			--if tChatData.channelCurrent:GetUniqueId() == channelRemoved then
+			if nCludge == channelRemoved then
 						
 				local channelNew = self:HelperFindAViewedChannel()
 				local wndInput = wnd:FindChild("Input")
@@ -1742,7 +1700,9 @@ function Killroy:Change_BuildInputTypeMenu()
 	
 		for idx, channelCurrent in pairs(tChannels) do -- gives us our viewed channels
 			local nCludge = Killroy:ChannelCludge(channelCurrent:GetName(),channelCurrent:GetType())
-			if self.tAllViewedChannels[channelCurrent:GetUniqueId()] ~= nil then
+			--02.05.15, disabling Unique ID due to Carbine issues
+			--if self.tAllViewedChannels[channelCurrent:GetUniqueId()] ~= nil then
+			if self.tAllViewedChannels[nCludge] ~= nil then
 				if channelCurrent:GetCommand() ~= nil and channelCurrent:GetCommand() ~= "" then -- make sure it"s a channelCurrent that can be spoken into
 					local strCommand = channelCurrent:GetAbbreviation()
 	
@@ -2001,12 +1961,16 @@ function Killroy:Change_OnViewCheck()
 		if not Killroy then return nil end
 	
 		local wndChannel = wndControl:GetParent()
+		--Print(wndChannel:GetName())
 		
 		local wndOptions = wndChannel:GetParent():GetParent():GetParent()
+		--Print(wndOptions:GetName())
 		
 		local tTypeData = wndChannel:GetData()
+		--Print(tostring(tTypeData))
 		
 		local eChannelId = tTypeData["nId"]
+		--Print(eChannelId)
 		
 		local tData = wndOptions:GetData()
 
@@ -2015,12 +1979,16 @@ function Killroy:Change_OnViewCheck()
 		end
 
 		if tData.tViewedChannels[eChannelId] then
-			tData.tViewedChannels[eChannelId] = false
+			--Print("Opt1")
+			tData.tViewedChannels[eChannelId] = nil
 			self:HelperRemoveChannelFromAll(eChannelId)
 		else
+			--Print("Opt2")
 			tData.tViewedChannels[eChannelId] = true
 			self:HelperAddChannelToAll(eChannelId)
 		end
+		
+		wndOptions:SetData(tData)
 	end
 end
 
@@ -2036,19 +2004,15 @@ function Killroy:Change_VerifyChannelVisibility()
 	
 		local nTestChannelType
 		
-		--1-5-8, new id parameter
-		nTestChannelType = self.tAllViewedChannels[channelChecking:GetUniqueId()]
+		--02.05.15, Carbine broken GetUniqueId, putting Cludge back in
+		--nTestChannelType = self.tAllViewedChannels[channelChecking:GetUniqueId()]
+		nTestChannelType = self.tAllViewedChannels[Killroy:ChannelCludge(channelChecking:GetName(), channelChecking:GetType())]
 		
 		if nTestChannelType ~= nil then -- see if this channelChecking is viewed
 			local strMessage = tInput.strMessage
 			
-			--as previous, use cludge if
 			local nCheckingType
-			if Killroy.tPrefs["bCustomChatColors"] then
-				nCheckingType = Killroy:ChannelCludge(channelChecking:GetName(),channelChecking:GetType())
-			else
-				nCheckingType = channelChecking:GetType()
-			end
+			nCheckingType = Killroy:ChannelCludge(channelChecking:GetName(),channelChecking:GetType())
 			
 			if nCheckingType == ChatSystemLib.ChatChannel_AccountWhisper then
 				if self.tAccountWhisperContex then
@@ -2138,16 +2102,18 @@ function Killroy:Change_AddChannelTypeToList()
 	function ChatLog:AddChannelTypeToList(tData, wndList, channel)
 		Killroy = Apollo.GetAddon("Killroy")
 		if not Killroy then return nil end
-		--insert a cludge her for channel type 18, so that it gets spread out into multple ids in the chat log
 		
+		--02.05.15, Carbine broke Unique ID, so I'm disabling it in favor of my Cludge
 		local nCludge = Killroy:ChannelCludge(channel:GetName(), channel:GetType())
-		local nId = channel:GetUniqueId()
+		--local nId = channel:GetUniqueId()
+		local nId = nCludge
 		local tTypeData = {}
 		tTypeData["nCludge"],tTypeData["nId"] = nCludge, nId
 		local wndChannelItem = Apollo.LoadForm(Killroy.xmlDoc, "ChatType", wndList, self)
 		wndChannelItem:FindChild("TypeName"):SetText(channel:GetName())
 		wndChannelItem:SetData(tTypeData)
-		wndChannelItem:FindChild("ViewCheck"):SetCheck(tData.tViewedChannels[nId] or false)
+		--wndChannelItem:FindChild("ViewCheck"):SetCheck(tData.tViewedChannels[nId] or false)
+		wndChannelItem:FindChild("ViewCheck"):SetCheck(tData.tViewedChannels[nCludge] or false)
 		
 		local CCB = wndChannelItem:FindChild("ChannelColorBtn")
 		if self.arChatColor[nCludge] then
@@ -2224,8 +2190,11 @@ function Killroy:Change_OnChatMessage()
 				
 		tQueuedMessage.strChannelName = channelCurrent:GetName()
 		tQueuedMessage.strChannelCommand = channelCurrent:GetCommand()
-		tQueuedMessage.idChannel = channelCurrent:GetUniqueId()		
+		-- 02.05.15, Carbine's broken Unique ID, reverting to Channel Cludges
+		--tQeuedMessage.idChannel = channelCurrent:GetUniqueId()		
+		tQueuedMessage.idChannel = Killroy:ChannelCludge(channelCurrent:GetName(), channelCurrent:GetType())		
 		
+
 		-- Killroy Range Filter Hooks
 		
 		-- Only engage the filter with say, emote and animated emotes, and if the message is not the players own
@@ -2598,6 +2567,38 @@ function Killroy:Change_HelperGenerateChatMessage()
 	
 	return true
 
+end
+
+function Killroy:Change_OnChatJoin()
+	
+	ChatLog = Apollo.GetAddon("ChatLog")
+	if not ChatLog then return nil end
+	
+	function ChatLog:OnChatJoin( channelJoined )
+		Killroy = Apollo.GetAddon("Killroy")
+		if not Killroy then return nil end	
+	
+		ChatSystemLib.PostOnChannel( ChatSystemLib.ChatChannel_Command, String_GetWeaselString(Apollo.GetString("ChatLog_JoinChannel"),  channelJoined:GetName()), "" );
+	
+		-- ChatJoin event is called both on startup and on join.
+	
+		for idx, wndChatWindow in pairs(self.tChatWindows) do
+			wndChatWindow:FindChild("InputWindow"):Close()
+	
+			-- explicit check for nil, it means we have have no saved setting for this channel displaying in this window.
+	
+			local tChatData = wndChatWindow:GetData()
+			
+			--if not tChatData.bCombatLog and tChatData.tViewedChannels[channelJoined:GetUniqueId()] == nil then
+			local nCludge = Killroy:ChannelCludge(channelJoined:GetName(), channelJoined:GetType())
+			if not tChatData.bCombatLog and tChatData.tViewedChannels[nCludge] == nil then
+				--self:HelperAddChannelToAll(channelJoined:GetUniqueId())
+				self:HelperAddChannelToAll(nCludge)
+				--tChatData.tViewedChannels[channelJoined:GetUniqueId()] = true
+				tChatData.tViewedChannels[nCludge] = true
+			end
+		end
+	end
 end
 
 function Killroy:Change_OnChatInputReturn()
