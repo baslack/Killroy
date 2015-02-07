@@ -140,7 +140,7 @@ function Killroy:new(o)
 			nEmoteBlend = knDefaultEmoteBlend,
 			nOOCBlend = knDefaultOOCBlend,
 			bLegacy = true,
-			sVersion = "1-5-14",
+			sVersion = "1-5-15",
 			strFontOption = "CRB_Interface12",
 			strRPFontOption = "CRB_Interface12_I",
 			strBubbleFontOption = "CRB_Interface12",
@@ -321,8 +321,8 @@ function Killroy:ChatWindows_Cleanup()
 		-- Clean ChatLog Master List
 		for j, this_chan in ipairs(tChannels) do --for each channel
 			if ChatLog.tAllViewedChannels[this_chan:GetUniqueId()] then --check if the channel is viewed by Unique Id
+				ChatLog.tAllViewedChannels[Killroy:ChannelCludge(this_chan:GetName(), this_chan:GetType())] = ChatLog.tAllViewedChannels[this_chan:GetUniqueId()] --Add Channel Cludge Entry
 				ChatLog.tAllViewedChannels[this_chan:GetUniqueId()] = nil -- eliminate Unique ID Entry
-				ChatLog.tAllViewedChannels[Killroy:ChannelCludge(this_chan:GetName(), this_chan:GetType())] = true --Add Channel Cludge Entry
 			end
 		end				
 		for index, this_viewed in pairs(ChatLog.tAllViewedChannels) do --have to do the master channel list as well
@@ -521,7 +521,7 @@ function Killroy:OnRestore(eLevel, tData)
 		self.tViewed = tData.arViewedChannels
 	end
 	
-	self.tPrefs["sVersion"] = "1-5-14"
+	self.tPrefs["sVersion"] = "1-5-15"
 	self.tPrefs["bCustomChatColors"] = true
 	
 	if (tData.tChatLogPrefs ~= nil) then
@@ -834,7 +834,7 @@ function Killroy:Command(...)
 										nEmoteBlend = knDefaultEmoteBlend,
 										nOOCBlend = knDefaultOOCBlend,
 										bLegacy = true,
-										sVersion = "1-5-14"
+										sVersion = "1-5-15"
 									}
 					chanCommand = self:GetChannelByName("Command")
 					self:SetupRPChannels()
@@ -1106,16 +1106,16 @@ end
 
 function Killroy:Myoptic()
 	local tResponses = {
-						"does something, but you can't make it out from here.",
-						"waves? You think they waved.",
-						"might have just flipped you off, but you couldn't really see from here.",
-						"is too far away to see exactly what they're up to.",
-						"appears to be talking animatedly, but you make out a word of it.",
-						"apparently has something on their mind. Maybe you should go see what?",
-						"looks like they want something. Maybe you should investigate?",
-						"says something, but you can't overhear it.",
-						"has an incredibly huge butt... wait, did you hear that right?",
-						"is just to far away to make out.",
+						" does something, but you can't make it out from here.",
+						" waves? You think they waved.",
+						" might have just flipped you off, but you couldn't really see from here.",
+						" is too far away to see exactly what they're up to.",
+						" appears to be talking animatedly, but you make out a word of it.",
+						" apparently has something on their mind. Maybe you should go see what?",
+						" looks like they want something. Maybe you should investigate?",
+						" says something, but you can't overhear it.",
+						" has an incredibly huge butt... wait, did you hear that right?",
+						" is just to far away to make out.",
 						}
 						
 	return tResponses[math.random(10)]
