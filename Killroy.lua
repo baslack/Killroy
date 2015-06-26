@@ -96,6 +96,7 @@ ktDefaultHolds[ChatSystemLib.ChatChannel_Whisper] = true
 local tagEmo = 101
 local tagSay = 102
 local tagOOC = 103
+local tagMention = 104
 
 local knDefaultSayRange = 30
 local knDefaultEmoteRange = 60
@@ -103,9 +104,11 @@ local knDefaultFalloff = 5
 local ksDefaultEmoteColor = "ffff9900"
 local ksDefaultSayColor = "ffffffff"
 local ksDefaultOOCColor = "ff7fffb9"
+local ksDefaultMentionColor = "ffff7fb9"
 local knDefaultICBlend = 0.5
 local knDefaultEmoteBlend = 1.0
 local knDefaultOOCBlend = 1.0
+local knDefaultMentionBlend = 1.0
 
 local enum_NoRP = 1
 local enum_RPOnly = 2
@@ -136,9 +139,11 @@ function Killroy:new(o)
 			kstrEmoteColor = ksDefaultEmoteColor,
 			kstrSayColor = ksDefaultSayColor,
 			kstrOOCColor 	= ksDefaultOOCColor,
+			kstrMentionColor = ksDefaultMentionColor,
 			nICBlend = knDefaultICBlend,
 			nEmoteBlend = knDefaultEmoteBlend,
 			nOOCBlend = knDefaultOOCBlend,
+			nMentionBlend = knDefaultMentionBlend,
 			bLegacy = true,
 			sVersion = "1-5-16",
 			strFontOption = "CRB_Interface12",
@@ -151,6 +156,7 @@ function Killroy:new(o)
 			kstrEmoteColor = ksDefaultEmoteColor,
 			kstrSayColor = ksDefaultSayColor,
 			kstrOOCColor 	= ksDefaultOOCColor,
+			kstrMentionColor = ksDefaultMentionColor,
 		}
 		self.tRFBuffer = {
 			nSayRange = knDefaultSayRange,
@@ -160,7 +166,8 @@ function Killroy:new(o)
 		self.tBlendBuffer = {
 			nICBlend = knDefaultICBlend,
 			nEmoteBlend = knDefaultEmoteBlend,
-			nOOCBlend = knDefaultOOCBlend,			
+			nOOCBlend = knDefaultOOCBlend,
+			nMentionBlend = knDefaultMentionBlend,
 		}
 		self.arChatColor = {}
 		self.arRPChannels = {}
@@ -173,6 +180,7 @@ function Killroy:new(o)
 			kstrEmoteColor = self.tPrefs["kstrEmoteColor"],
 			kstrSayColor = self.tPrefs["kstrSayColor"],
 			kstrOOCColor 	= self.tPrefs["kstrOOCColor"],
+			kstrMentionColor = self.tPrefs["kstrMentionColor"],
 		}
 		self.tRFBuffer =
 		{
@@ -184,6 +192,7 @@ function Killroy:new(o)
 			nICBlend = self.tPrefs["nICBlend"],
 			nEmoteBlend = self.tPrefs["nEmoteBlend"],
 			nOOCBlend = self.tPrefs["nOOCBlend"],
+			nMentionBlend = self.tPrefs["nMentionBlend"],
 		}
 	end
 	
@@ -230,9 +239,11 @@ function Killroy:OnDocumentLoaded()
 	Apollo.RegisterEventHandler("OnSetEmoteColor", OnSetEmoteColor, self)
 	Apollo.RegisterEventHandler("OnSetSayColor", OnSetSayColor, self)
 	Apollo.RegisterEventHandler("OnSetOOCColor", OnSetOOCColor, self)
+	Apollo.RegisterEventHandler("OnSetMentionColor", OnSetMentionColor, self)
 	Apollo.RegisterEventHandler("OnICBlend", OnICBlend, self)
 	Apollo.RegisterEventHandler("OnEmoteBlend", OnEmoteBlend, self)
 	Apollo.RegisterEventHandler("OnOOCBlend", OnOOCBlend, self)
+	Apollo.RegisterEventHandler("OnMentionBlend", OneMentionBlend, self)
 	Apollo.RegisterEventHandler("InterfaceMenuListHasLoaded", "OnInterfaceMenuListHasLoaded", self)
 	Apollo.RegisterEventHandler("ToggleKillroy", "OnKillroyOn", self)
 
@@ -437,7 +448,9 @@ function Killroy:OnConfigure()
 	self.wndMain:FindChild("setSayColor"):SetBGColor(self.tPrefs["kstrSayColor"])
 	self.wndMain:FindChild("nICBlend"):SetValue(self.tPrefs["nICBlend"])
 	self.wndMain:FindChild("setOOCColor"):SetBGColor(self.tPrefs["kstrOOCColor"])
+	self.wndMain:FindChild("setMentionColor"):SetBGColor(self.tPrefs["kstrMentionColor"])
 	self.wndMain:FindChild("nOOCBlend"):SetValue(self.tPrefs["nOOCBlend"])
+	self.wndMain:FindChild("nMentionBlend"):SetValue(self.tPrefs["nMentionBlend"])
 	self.wndMain:FindChild("nSayRange"):SetValue(self.tPrefs["nSayRange"])
 	self.tRFBuffer["nSayRange"] = self.tPrefs["nSayRange"]
 	self.wndMain:FindChild("nEmoteRange"):SetValue(self.tPrefs["nEmoteRange"])
@@ -830,9 +843,11 @@ function Killroy:Command(...)
 										kstrEmoteColor = ksDefaultEmoteColor,
 										kstrSayColor = ksDefaultSayColor,
 										kstrOOCColor 	= ksDefaultOOCColor,
+										kstrMentionColor = ksDefaultMentionColor,
 										nICBlend = knDefaultICBlend,
 										nEmoteBlend = knDefaultEmoteBlend,
 										nOOCBlend = knDefaultOOCBlend,
+										nMentionBlend = knDefaultMentionBlend,
 										bLegacy = true,
 										sVersion = "1-5-16"
 									}
@@ -935,6 +950,7 @@ function Killroy:ParseForContext(strText, eChannelType)
 	emotes = {}
 	quotes = {}
 	oocs = {}
+  mentions = {}
 	
 	index = 1
 	for emote in strText:gmatch("%b**") do
@@ -957,11 +973,39 @@ function Killroy:ParseForContext(strText, eChannelType)
 		index = last + 1
 	end
 	
+
+	
+	local uPlayer = GameLib.GetPlayerUnit()
+	self.strPlayerName = uPlayer:GetName()
+
+	local kstrWordPatternLoose = "[^%c%s1234567890%?%.%-,;:'\"%+=@!\\%(%)&%$%%`%[%]/%^%*<>#|]+" 
+	local firstName, lastName = string.match(self.strPlayerName, "("..kstrWordPatternLoose ..") ("..kstrWordPatternLoose ..")")
+
+	index = 1
+	for mention in strText:gmatch(firstName) do
+		first, last = strText:find(mention, index, true)
+		mentions[first] = last
+		index = last + 1
+	end
+
+	for mention in strText:gmatch(lastName ) do
+		first, last = strText:find(mention, index, true)
+		mentions[first] = last
+		index = last + 1
+	end
+	
 	buffer = ""
 	index = 1
 	
 	while index <= strText:len() do
-		if oocs[index] then
+		if mentions[index] then
+			if buffer then
+				table.insert(parsedText, {buffer, tagByChan()})
+				buffer = ""
+			end
+			table.insert(parsedText, {strText:sub(index, mentions[index]), tagMention})
+			index = mentions[index] + 1
+		elseif oocs[index] then
 			if buffer then
 				table.insert(parsedText, {buffer, tagByChan()})
 				buffer = ""
@@ -1029,13 +1073,17 @@ function Killroy:DumpToChat(parsedText, nChannel, strChatFont, xml)
 	
 	local AC_OOC = ApolloColor.new(self.tPrefs["kstrOOCColor"])
 	local AC_IC = ApolloColor.new(self.tPrefs["kstrSayColor"])
-	local AC_EMO = ApolloColor.new(self.tPrefs["kstrEmoteColor"])	
+	local AC_EMO = ApolloColor.new(self.tPrefs["kstrEmoteColor"])
+	local AC_MEN = ApolloColor.new(self.tPrefs["kstrMentionColor"])
 	local AC_BlendColorOOC = self:ABOverColor(ChatLog.arChatColor[nChannel], AC_OOC, Legacy(nChannel, self.tPrefs["nOOCBlend"]))
 	local AC_BlendColorEmote = self:ABOverColor(ChatLog.arChatColor[nChannel], AC_EMO, Legacy(nChannel, self.tPrefs["nEmoteBlend"]))
 	local AC_BlendColorIC = self:ABOverColor(ChatLog.arChatColor[nChannel], AC_IC, Legacy(nChannel, self.tPrefs["nICBlend"]))
+	local AC_BlendColorMention = self:ABOverColor(ChatLog.arChatColor[nChannel], AC_MEN, Legacy(nChannel, self.tPrefs["nMentionBlend"]))
 		
 	for i,t in ipairs(parsedText) do
-		if t[2] == tagEmo then
+		if t[2] == tagMention then
+			xml:AppendText(t[1], AC_BlendColorMention, strChatFont)
+		elseif t[2] == tagEmo then
 			xml:AppendText(t[1], AC_BlendColorEmote, strChatFont)
 		elseif t[2] == tagSay then
 			xml:AppendText(t[1], AC_BlendColorIC, strChatFont)
@@ -2783,12 +2831,14 @@ function Killroy:OnOK()
 	self.tPrefs["kstrEmoteColor"] = self.tColorBuffer["kstrEmoteColor"]
 	self.tPrefs["kstrSayColor"] = self.tColorBuffer["kstrSayColor"]
 	self.tPrefs["kstrOOCColor"] = self.tColorBuffer["kstrOOCColor"]
+	self.tPrefs["kstrMentionColor"] = self.tColorBuffer["kstrMentionColor"]
 	self.tPrefs["nSayRange"] = self.tRFBuffer["nSayRange"]
 	self.tPrefs["nEmoteRange"] = self.tRFBuffer["nEmoteRange"]
 	self.tPrefs["nFalloff"] = self.tRFBuffer["nFalloff"]
 	self.tPrefs["nICBlend"] = self.tBlendBuffer["nICBlend"]
 	self.tPrefs["nEmoteBlend"] = self.tBlendBuffer["nEmoteBlend"]
 	self.tPrefs["nOOCBlend"] = self.tBlendBuffer["nOOCBlend"]
+	self.tPrefs["nMentionBlend"] = self.tBlendBuffer["nMentionBlend"]
 	--ChatLog Overrides
 	self.tChatLogPrefs["bProfanityFilter"] = self.wndMain:FindChild("bProfanityFilter"):IsChecked()
 	self:Override_ChatLog_ProfanityFilter()
@@ -2829,12 +2879,14 @@ function Killroy:OnCancel()
 	self.tColorBuffer["kstrEmoteColor"] = self.tPrefs["kstrEmoteColor"] 
 	self.tColorBuffer["kstrSayColor"] = self.tPrefs["kstrSayColor"]
 	self.tColorBuffer["kstrOOCColor"] = self.tPrefs["kstrOOCColor"]
+	self.tColorBuffer["kstrMentionColor"] = self.tPrefs["kstrMentionColor"]
 	self.tRFBuffer["nSayRange"] = self.tPrefs["nSayRange"]
 	self.tRFBuffer["nEmoteRange"] = self.tPrefs["nEmoteRange"]
 	self.tRFBuffer["nFalloff"] = self.tPrefs["nFalloff"]
 	self.tBlendBuffer["nICBlend"] = self.tPrefs["nICBlend"]
 	self.tBlendBuffer["nEmoteBlend"] = self.tPrefs["nEmoteBlend"]
 	self.tBlendBuffer["nOOCBlend"] = self.tPrefs["nOOCBlend"]
+	self.tBlendBuffer["nMentionBlend"] = self.tPrefs["nMentionBlend"]
 	--ChatLog Overrides
 	self.wndMain:FindChild("bProfanityFilter"):SetCheck(self.tChatLogPrefs["bProfanityFilter"])
 	self:Override_ChatLog_ProfanityFilter()
@@ -2869,6 +2921,16 @@ end
 function Killroy:OnSetOOCColorOk(hexcolor)
 	self.tColorBuffer["kstrOOCColor"] = hexcolor
 	self.wndMain:FindChild("setOOCColor"):SetBGColor(hexcolor)
+end
+
+function Killroy:OnSetMentionColor( wndHandler, wndControl, eMouseButton )
+	tAddon = Apollo.GetAddon("Killroy")
+	GeminiColor:ShowColorPicker( tAddon, "OnSetMentionColorOk", true, self.tColorBuffer["kstrMentionColor"])
+end
+
+function Killroy:OnSetMentionColorOk(hexcolor)
+	self.tColorBuffer["kstrMentionColor"] = hexcolor
+	self.wndMain:FindChild("setMentionColor"):SetBGColor(hexcolor)
 end
 
 function Killroy:OnSetEmoteColor( wndHandler, wndControl, eMouseButton )
