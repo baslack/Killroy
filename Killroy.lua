@@ -981,6 +981,15 @@ function Killroy:ParseForContext(strText, eChannelType)
 	local kstrWordPatternLoose = "[^%c%s1234567890%?%.%-,;:'\"%+=@!\\%(%)&%$%%`%[%]/%^%*<>#|]+" 
 	local firstName, lastName = string.match(self.strPlayerName, "("..kstrWordPatternLoose ..") ("..kstrWordPatternLoose ..")")
 
+	-- for some reason, sometimes they are suddenly nil and gmatch will break
+	-- hotfix until actual reason is known
+	if firstName ==  nil then
+		firstName = ""
+	end
+	if lastName ==  nil then
+		lastName = ""
+	end
+
 	index = 1
 	for mention in strText:gmatch(firstName) do
 		first, last = strText:find(mention, index, true)
