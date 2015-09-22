@@ -145,7 +145,7 @@ function Killroy:new(o)
 			nOOCBlend = knDefaultOOCBlend,
 			nMentionBlend = knDefaultMentionBlend,
 			bLegacy = true,
-			sVersion = "1-5-17",
+			sVersion = "1-5-18",
 			strFontOption = "CRB_Interface12",
 			strRPFontOption = "CRB_Interface12_I",
 			strBubbleFontOption = "CRB_Interface12",
@@ -534,7 +534,7 @@ function Killroy:OnRestore(eLevel, tData)
 		self.tViewed = tData.arViewedChannels
 	end
 	
-	self.tPrefs["sVersion"] = "1-5-17"
+	self.tPrefs["sVersion"] = "1-5-18"
 	self.tPrefs["bCustomChatColors"] = true
 	
 	if (tData.tChatLogPrefs ~= nil) then
@@ -849,7 +849,7 @@ function Killroy:Command(...)
 										nOOCBlend = knDefaultOOCBlend,
 										nMentionBlend = knDefaultMentionBlend,
 										bLegacy = true,
-										sVersion = "1-5-17"
+										sVersion = "1-5-18"
 									}
 					chanCommand = self:GetChannelByName("Command")
 					self:SetupRPChannels()
@@ -950,7 +950,8 @@ function Killroy:ParseForContext(strText, eChannelType)
 	emotes = {}
 	quotes = {}
 	oocs = {}
-  mentions = {}
+    mentionsFirst = {}
+    mentionsLast = {}
 	
 	index = 1
 	for emote in strText:gmatch("%b**") do
@@ -972,9 +973,7 @@ function Killroy:ParseForContext(strText, eChannelType)
 		oocs[first] = last
 		index = last + 1
 	end
-	
-
-	
+		
 	local uPlayer = GameLib.GetPlayerUnit()
 	self.strPlayerName = uPlayer:GetName()
 
@@ -990,30 +989,42 @@ function Killroy:ParseForContext(strText, eChannelType)
 		lastName = ""
 	end
 
+	firstName = string.lower(firstName)
+	lastName = string.lower(lastName)	
+	strLower = string.lower(strText)
+
 	index = 1
-	for mention in strText:gmatch(firstName) do
-		first, last = strText:find(mention, index, true)
-		mentions[first] = last
+	for mention in strLower:gmatch(firstName) do
+		first, last = strLower:find(mention, index, true)
+		mentionsFirst[first] = last
 		index = last + 1
 	end
 
-	for mention in strText:gmatch(lastName ) do
-		first, last = strText:find(mention, index, true)
-		mentions[first] = last
+	index = 1
+	for mention in strLower:gmatch(lastName ) do
+		first, last = strLower:find(mention, index, true)
+		mentionsLast[first] = last
 		index = last + 1
 	end
 	
 	buffer = ""
 	index = 1
-	
+
 	while index <= strText:len() do
-		if mentions[index] then
+		if mentionsFirst[index] then
 			if buffer then
 				table.insert(parsedText, {buffer, tagByChan()})
 				buffer = ""
 			end
-			table.insert(parsedText, {strText:sub(index, mentions[index]), tagMention})
-			index = mentions[index] + 1
+			table.insert(parsedText, {strText:sub(index, mentionsFirst[index]), tagMention})
+			index = mentionsFirst[index] + 1
+		elseif mentionsLast[index] then
+			if buffer then
+				table.insert(parsedText, {buffer, tagByChan()})
+				buffer = ""
+			end
+			table.insert(parsedText, {strText:sub(index, mentionsLast[index]), tagMention})
+			index = mentionsLast[index] + 1
 		elseif oocs[index] then
 			if buffer then
 				table.insert(parsedText, {buffer, tagByChan()})
@@ -1052,6 +1063,12 @@ end
 function Killroy:ABOverColor(A, B, nBlend)
 	-- requires A,B be ApolloColor Objects
 	-- nBlend is a float
+
+	-- sometimes after /reloadui, ChatLog.arChatColor[nChannel] returns nil
+	-- hotfix until actual reason is known
+	if A == nil then
+		A = ApolloColor.new(self.tPrefs["kstrOOCColor"])
+	end
 	
 	local tA = A:ToTable()
 	local tB = B:ToTable()
