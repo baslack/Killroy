@@ -2075,6 +2075,8 @@ function Killroy:Change_VerifyChannelVisibility()
 		if not Killroy then return nil end
 		
 		local tChatData = wndChat:GetData()
+ 
+		local bNewChannel = self.channelLastChannel ~= channelChecking
 	
 		local nTestChannelType
 		
@@ -2104,7 +2106,7 @@ function Killroy:Change_VerifyChannelVisibility()
 
 			-- if there is a str command, they are changing the channel, or whisper target
 			--the target can be the same as the last target
-			if tInput.strCommand ~= "" then
+			if tInput.strCommand ~= "" or bNewChannel then
 				self.strLastTarget = ""
 			end
 			
@@ -2431,22 +2433,19 @@ function Killroy:Change_HelperGenerateChatMessage()
 
 			local tPreviousWhisperer = self.tLastWhisperer
 
-			self.tLastWhisperer =
-			{
-				strCharacterName = tMessage.strSender,
-				strRealmName = nil,
-				strDisplayName = nil,
-				eChannelType = ChatSystemLib.ChatChannel_AccountWhisper
-			}
-
 			local tAccountFriends = FriendshipLib.GetAccountList()
 			for idx, tAccountFriend in pairs(tAccountFriends) do
 				if tAccountFriend.arCharacters ~= nil then
 					for idx, tCharacter in pairs(tAccountFriend.arCharacters) do
 						if tCharacter.strCharacterName == tMessage.strSender and (tMessage.strRealmName:len() == 0 or tCharacter.strRealm == tMessage.strRealmName) then
 							if not tMessage.bSelf or (tPreviousWhisperer and tPreviousWhisperer.strCharacterName == tMessage.strSender) then
-								self.tLastWhisperer.strDisplayName = tAccountFriend.strCharacterName
-								self.tLastWhisperer.strRealmName = tCharacter.strRealm
+								self.tLastWhisperer =
+								{
+									strCharacterName = tMessage.strSender,
+									strRealmName = tCharacter.strRealm,
+									strDisplayName = tAccountFriend.strCharacterName,
+									eChannelType = ChatSystemLib.ChatChannel_AccountWhisper
+								}
 							end
 							strDisplayName = tAccountFriend.strCharacterName						
 						end
