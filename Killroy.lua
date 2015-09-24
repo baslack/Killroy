@@ -2258,6 +2258,7 @@ function Killroy:Change_OnChatMessage()
 		tQueuedMessage.tMessage = tMessage
 		
 		--Cludge for custom channels
+		tQueuedMessage.eChannelTypeOriginal = channelCurrent:GetType()
 		if Killroy.tPrefs["bCustomChatColors"] then
 			tQueuedMessage.eChannelType = Killroy:ChannelCludge(channelCurrent:GetName(),channelCurrent:GetType())
 		else
@@ -2380,6 +2381,7 @@ function Killroy:Change_HelperGenerateChatMessage()
 		end
 
 		local eChannelType = tQueuedMessage.eChannelType
+		local eChannelTypeOriginal = tQueuedMessage.eChannelTypeOriginal or tQueuedMessage.eChannelType
 		local tMessage = tQueuedMessage.tMessage
 		
 		-- Different handling for combat log
@@ -2398,6 +2400,7 @@ function Killroy:Change_HelperGenerateChatMessage()
 		local crText = self.arChatColor[eChannelType] or ApolloColor.new("white")
 		local crChannel = self.arChatColor[eChannelType] or ApolloColor.new("white")
 		local crPlayerName = ApolloColor.new("ChatPlayerName")
+
 		local strTime = ""
 		if self.bShowTimestamp then
 			strTime = self:HelperGetTimeStr()
@@ -2480,7 +2483,7 @@ function Killroy:Change_HelperGenerateChatMessage()
 			xml:AppendText(" ")
 		else
 			local strChannel
-			if eChannelType == ChatSystemLib.ChatChannel_Society then
+			if eChannelTypeOriginal == ChatSystemLib.ChatChannel_Society or eChannelTypeOriginal == ChatSystemLib.ChatChannel_Custom then
 				strChannel = (string.format("%s ", String_GetWeaselString(Apollo.GetString("ChatLog_GuildCommand"), tQueuedMessage.strChannelName, tQueuedMessage.strChannelCommand))) --String DB removed empty characters at the end of string, so have to hardcode it here.
 			else
 				strChannel = String_GetWeaselString(Apollo.GetString("CRB_Brackets_Space"), tQueuedMessage.strChannelName)
@@ -2510,7 +2513,7 @@ function Killroy:Change_HelperGenerateChatMessage()
 
 				local strCross = tMessage.bCrossFaction and "true" or "false"--has to be a string or a number due to code restriction
 				xml:AppendText( strDisplayName, crPlayerName, self.strFontOption, {strCharacterName = strWhisperName, nReportId = tMessage.nReportId , strCrossFaction = strCross}, "Source")
-	end
+			end
 			xml:AppendText( strPresenceState .. Apollo.GetString("Chat_ColonBreak"), crChannel, self.strFontOption, "Left")
 		end
 
