@@ -1394,8 +1394,6 @@ function Killroy:ChannelCludge(sName,nType)
 	local knFudgeCircle = 90
 	local nCludge = 0
 	
-	--TODO, go through Society and rework logic to match Custom
-	
 	local bIsSociety = nType == ChatSystemLib.ChatChannel_Society
 	local bIsCustom = nType == ChatSystemLib.ChatChannel_Custom
 	
@@ -1415,117 +1413,99 @@ function Killroy:ChannelCludge(sName,nType)
 			table.insert(customs, this_chan:GetName())
 		end
 		
+		-- this sort maybe unnecessary due to the way that channels are added by join order
+		-- unsure, left in the maintain previous behavior as much as possible
 		table.sort(societies)
 		for i, v in pairs(societies) do self.glog:debug(string.format('%d,%s', i,v)) end
 		table.sort(customs)
 		for i, v in pairs(customs) do self.glog:debug(string.format('%d,%s', i,v)) end
+		
 		local nPotentialID
 		
+		-- created for convenience, so that same code can work both tables
+		local arWorking
+		
 		if bIsSociety then
-			-- if the society doesn't exist in the table already
-			if self.arSocietyChannels[sName] == nil then
-				-- for each of the societies currently in
-				for i, this_society in pairs(societies) do
-					-- if that society matches the name of the channel we're looking for
-					if this_society == sName then
-						--set a potential id based on it's place in line, alphabetically
+			arWorking = self.arSocietyChannels
+		elseif bIsCustomer then
+			arWorking = self.arCustomChannels
+		end
+		
+		local bDNE_InWorking 
+		bDNE_InWorking = arWorking[sName] == nil
+
+		-- if the custom doesn't exist in the table already
+		if bDNE_InWorking then
+			self.glog:debug(string.format('ChannelClugde, %s not in arCustomChannels or arSocietyChannels.', sName))
+			-- for each of the customs currently in
+			local test_these_channels
+			if bIsSociety then
+				self.glog('ChannelCludge: Testing against societies.')
+				test_these_channels = societies
+			elseif bIsCustom
+				self.glog('ChannelCludge: Testing against custom channels.')
+				test_these_channels = customs
+			end
+			for i, this_chan in pairs(test_these_channels) do
+				self.glog:debug(string.format('ChannelCludge comparing to %s', this_chan))
+				-- if that custom matches the name of the channel we're looking for
+				if this_chan == sName then
+					self.glog:debug('ChannelCludge compare matches sName')
+					--set a potential id based on it's place in line, alphabetically
+					if bIsSociety then
 						nPotentialID = i+knFudgeCircle
-						--assume that id already exists
-						local bIdExists = true
-						--but no matches have been found yet
-						local bMatch = false
-						--as long as the id already exists, look for matches
-						while bIdExists do
-							--for each society already known
-							for name,id in pairs(self.arSocietyChannels) do
+					elseif bIsCustom then
+						nPotentialID = i+knFudgeCustom
+					end
+					self.glog:debug(string.format('ChannelCludge proposed ID is %s', nPotentialID))
+					--assume that id already exists
+					local bIdExists = true
+					--but no matches have been found yet
+					local bMatch = false
+					--as long as the id already exists, look for matches
+					while bIdExists do
+						--check to see if there's any entries at all
+						local nCount = self:COuntTable(arWorking)
+						-- if there are entries, test agains each
+						if nCount ~= 0 then
+							self.glog:debug('Channel Cludge: Has entries to check against.')
+							for name,id in pairs(arWorking) do
+								self.glog:debug(string.format('comparing %s, with %s', name, id))
 								-- a match occurs if ANY of the ids match the potential id
 								bMatch = bMatch or (nPotentialID == id)
+								self.glog:debug(string.format('ChannelCludge match found: %s', tostring(bMatch)))
 							end
 							--if any match was found
 							if bMatch then
 								--increment the potential id and try again
 								nPotentialID = nPotentialID + 1
+								self.glog:debug(string.format('ChannelCludge proposed id changed to %s', nPotentialID))
+								-- important, remember that if this stays true, infinite loop
+								bMatch = false
 							-- if no match was found
 							else
 								-- then the original premise was false and we can stop looking
 								bIdExists = false
 							end
+						-- if not entries, then the assumption is disproved
+						else
+							bIdExists = false
 						end
-						-- set the sociey's id to the discovered potential
-						self.arSocietyChannels[sName] = nPotentialID
 					end
+					-- set the custom's id to the discovered potential
+					arWorking[sName] = nPotentialID
 				end
-				-- return the new id
-				return self.arSocietyChannels[sName]
-			-- the society's id has already been determined
-			else
-				--return the already determined id
-				return self.arSocietyChannels[sName]
 			end
-		end
-
-		if bIsCustom then
-			-- if the custom doesn't exist in the table already
-			if self.arCustomChannels[sName] == nil then
-				self.glog:debug(string.format('ChannelClugde, %s not in arCustomChannels.', sName))
-				-- for each of the customs currently in
-				for i, this_custom in pairs(customs) do
-					self.glog:debug(string.format('ChannelCludge comparing to %s', this_custom))
-					-- if that custom matches the name of the channel we're looking for
-					if this_custom == sName then
-						self.glog:debug('ChannelCludge compare matches sName')
-						--set a potential id based on it's place in line, alphabetically
-						nPotentialID = i+knFudgeCustom
-						self.glog:debug(string.format('ChannelCludge proposed ID is %s', nPotentialID))
-						--assume that id already exists
-						local bIdExists = true
-						--but no matches have been found yet
-						local bMatch = false
-						--as long as the id already exists, look for matches
-						while bIdExists do
-							--for each custom already known
-							if self:CountTable(self.arCustomChannels) ~= 0 then
-								self.glog:debug('arCustomChannels has entries')
-								for name,id in pairs(self.arCustomChannels) do
-									self.glog:debug(string.format('comparing %s, with %s', name, id))
-									-- a match occurs if ANY of the ids match the potential id
-									bMatch = bMatch or (nPotentialID == id)
-									self.glog:debug(string.format('ChannelCludge match found: %s', tostring(bMatch)))
-								end
-								--if any match was found
-								if bMatch then
-									--increment the potential id and try again
-									nPotentialID = nPotentialID + 1
-									self.glog:debug(string.format('ChannelCludge proposed id changed to %s', nPotentialID))
-									bMatch = false
-								-- if no match was found
-								else
-									-- then the original premise was false and we can stop looking
-									bIdExists = false
-								end
-							else
-								bIdExists = false
-							end
-							--self.glog:debug(string.format('ChannelCludge\n name:%s, compare:%s, nP:%s, bE:%s, bM%s', sName, tostring(name), nPotentialID, tostring(bIdExists), tostring(bMatch)))
-						end
-						-- set the custom's id to the discovered potential
-						self.arCustomChannels[sName] = nPotentialID
-						--self.glog:debug(string.format('ChannelCludge %s, %s', self.arCustomChannels[sName], nPotentialID))
-					end
-				end
-				-- return the new id
-				self.glog:debug(string.format('DNE ChannelCludge = %s, %s', sName, tostring(self.arCustomChannels[sName])))
-				return self.arCustomChannels[sName]
-			-- the custom's id has already been determined
-			else
-				--return the already determined id
-				self.glog:debug(string.format('ChannelCludge, %s is in arCustomChannels.', sName))
-				self.glog:debug(string.format('E ChannelCludge = %s, %s', sName, tostring(self.arCustomChannels[sName])))
-				return self.arCustomChannels[sName]
-			end
+			-- return the new id
+			self.glog:debug(string.format('ChannelCludge(DNE) = %s, %s', sName, tostring(arWorking[sName])))
+			return self.arWorking[sName]
+		-- the custom's id has already been determined
+		else
+			--return the already determined id
+			self.glog:debug(string.format('ChannelCludge(E) = %s, %s', sName, tostring(arWorking[sName])))
+			return self.arWorking[sName]
 		end
 	end
-	
 end
 
 function Killroy:OldChannelCludge(sName,nType)
