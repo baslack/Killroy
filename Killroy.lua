@@ -25,6 +25,8 @@ local GeminiColor
 -----------------------------------------------------------------------------------------------
 -- e.g. local kiExampleVariableMax = 999
 
+local knCutoffVersion = 1.518
+
 local kcrInvalidColor = ApolloColor.new("InvalidChat")
 local kcrValidColor = ApolloColor.new("white")
 
@@ -145,7 +147,7 @@ function Killroy:new(o)
 			nOOCBlend = knDefaultOOCBlend,
 			nMentionBlend = knDefaultMentionBlend,
 			bLegacy = true,
-			sVersion = "1-5-18",
+			sVersion = "1-5-19",
 			strFontOption = "CRB_Interface12",
 			strRPFontOption = "CRB_Interface12_I",
 			strBubbleFontOption = "CRB_Interface12",
@@ -173,6 +175,9 @@ function Killroy:new(o)
 		self.arRPChannels = {}
 		self.arRPFilterChannels = {}
 		self.tChatLogPrefs = {}
+		self.arCustomChannels = {}
+		self.arSocietyChannels = {}
+		self.tViewed = {}
 		
 	else
 		self.tColorBuffer = 
@@ -224,6 +229,12 @@ end
 
 function Killroy:OnDocumentLoaded()
 	GeminiColor = Apollo.GetPackage("GeminiColor").tPackage
+	GeminiLogging = Apollo.GetPackage("Gemini:Logging-1.2").tPackage
+	self.glog = GeminiLogging:GetLogger({
+		level = GeminiLogging.DEBUG,
+        pattern = "%d %n %c %l - %m",
+        appender = "GeminiConsole"
+    })
 	
 	self.wndMain = Apollo.LoadForm(self.xmlDoc, "KillroyForm", nil, self)
 	self.wndMain:Show(false, true)
@@ -246,6 +257,7 @@ function Killroy:OnDocumentLoaded()
 	Apollo.RegisterEventHandler("OnMentionBlend", OneMentionBlend, self)
 	Apollo.RegisterEventHandler("InterfaceMenuListHasLoaded", "OnInterfaceMenuListHasLoaded", self)
 	Apollo.RegisterEventHandler("ToggleKillroy", "OnKillroyOn", self)
+	Apollo.RegisterEventHandler("ChatLeave", "OnChatLeave", self)
 
 	
 	-- replace ChatLogFunctions
@@ -501,7 +513,9 @@ function Killroy:OnSave(eLevel)
 				arChatColor = self.arChatColor,
 				arRPChannels = self.arRPChannels,
 				arRPFilterChannels = self.arRPFilterChannels,
-				arViewedChannels = self:ViewedChannelsSave()
+				arViewedChannels = self:ViewedChannelsSave(),
+				--arCustomChannels = self.arCustomChannels,
+				--arSocietyChannels = self.arSocietyChannels
 				}
 	else
 		return nil
@@ -515,11 +529,13 @@ function Killroy:OnRestore(eLevel, tData)
 			self.tPrefs[i] = v
 		end
 	end
+	
 	if (tData.arChatColor ~= nil) then
 		for i,v in pairs(tData.arChatColor) do
 			self.arChatColor[i] = v
 		end
 	end
+	
 	if (tData.arRPChannels ~= nil) then
 		for i,v in pairs(tData.arRPChannels) do
 			self.arRPChannels[i] = v
@@ -530,11 +546,23 @@ function Killroy:OnRestore(eLevel, tData)
 			self.arRPFilterChannels[i] = v
 		end
 	end
+	
 	if (tData.arViewedChannels ~= nil) then
+		Apollo.AddAddonErrorText('tViewedLoaded')
 		self.tViewed = tData.arViewedChannels
 	end
 	
-	self.tPrefs["sVersion"] = "1-5-18"
+	if (tData.arCustomChannels ~= nil) then
+		for i,v in pairs(tData.arCustomChannels) do
+			self.arCustomChannels[i] = v
+		end
+	end
+	
+	if (tData.arSocietyChannels ~= nil) then
+		for i,v in pairs(tData.arSocietyChannels) do
+			self.arSocietyChannels[i] = v
+		end
+	end	self.tPrefs["sVersion"] = "1-5-19"
 	self.tPrefs["bCustomChatColors"] = true
 	
 	if (tData.tChatLogPrefs ~= nil) then
@@ -542,11 +570,46 @@ function Killroy:OnRestore(eLevel, tData)
 			self.tChatLogPrefs[i] = v
 		end
 	end
+
+	self:FixChannelIds()
 end
 
 ----------------------------
 --Killroy Specific Functions
 ----------------------------
+
+function Killroy:FixChannelIds()
+	channels = {}
+	for i, this_chan in ipairs(self:GetSocieties()) do
+		table.insert(channels, this_chan)
+	end
+	for i, this_chan in ipairs(self:GetCustomChannels()) do
+		table.insert(channels, this_chan)
+	end
+	
+	for i, this_chan in ipairs(channels) do
+		local newID = self:ChannelCludge(this_chan:GetName(),this_chan:GetType())
+		local oldID = self:OldChannelCludge(this_chan:GetName(),this_chan:GetType())
+		if self.arChatColor[oldID] then
+			self.arChatColor[newID] = self.arChatColor[oldID]
+			self.arChatColor[oldID] = nil
+		end
+		if self.arRPChannels[oldID] then
+			self.arRPChannels[newID] = self.arRPChannels[oldID]
+			self.arRPChannels[oldID] = nil
+		end
+		if self.arRPFilterChannels[oldID] then
+			self.arRPFilterChannels[newID] = self.arRPFilterChannels[oldID]
+			self.arRPFilterChannels[oldID] = nil
+		end
+		for i, tViewed in ipairs(self.tViewed) do
+			if tViewed[oldID] then
+				tViewed[newID] = true
+				tViewed[oldID] = nil
+			end
+		end
+	end
+end
 
 function Killroy:DumpChannelNames()
 	for idx, this_chan in ipairs(ChatSystemLib.GetChannels()) do
@@ -1286,7 +1349,186 @@ function Killroy:Restore_arChatColor()
 	
 end
 
+function Killroy:OnChatLeave(chanLeft, bKicked, bBanned)
+	if self.arCustomChannels[chanLeft:GetName()] then
+		self.arCustomChannels[chanLeft:GetName()] = nil
+	end
+	
+	if self.arSocietyChannels[chanLeft:GetName()] then
+		self.arSocietyChannels[chanLeft:GetName()] = nil
+	end
+end
+
+function Killroy:GetSocieties()
+	local channels = ChatSystemLib.GetChannels()
+	local societies = {}
+	
+	for i, this_chan in ipairs(channels) do
+		if this_chan:GetType() == ChatSystemLib.ChatChannel_Society then
+			table.insert(societies, this_chan)
+		end
+	end
+	return societies
+end
+
+function Killroy:GetCustomChannels()
+	local channels = ChatSystemLib.GetChannels()
+	local customs = {}
+	
+	for i, this_chan in ipairs(channels) do
+		if this_chan:GetType() == ChatSystemLib.ChatChannel_Custom then
+			table.insert(customs, this_chan)
+		end
+	end
+	return customs
+end
+
+function Killroy:CountTable(t)
+	local count = 0
+	for _ in pairs(t) do count = count + 1 end
+	return count
+end
+
 function Killroy:ChannelCludge(sName,nType)
+	local knFudgeCustom = 80
+	local knFudgeCircle = 90
+	local nCludge = 0
+	
+	--TODO, go through Society and rework logic to match Custom
+	
+	local bIsSociety = nType == ChatSystemLib.ChatChannel_Society
+	local bIsCustom = nType == ChatSystemLib.ChatChannel_Custom
+	
+	-- if the channel isn't a society or custom
+	-- we don't have to be concerned with it
+	if not(bIsCustom or bIsSociety) then
+		return nType
+	else
+		local societies = {}
+		local customs = {}
+		
+		for i,this_chan in ipairs(self:GetSocieties()) do
+			table.insert(societies, this_chan:GetName())
+		end
+		
+		for i,this_chan in ipairs(self:GetCustomChannels()) do
+			table.insert(customs, this_chan:GetName())
+		end
+		
+		table.sort(societies)
+		for i, v in pairs(societies) do self.glog:debug(string.format('%d,%s', i,v)) end
+		table.sort(customs)
+		for i, v in pairs(customs) do self.glog:debug(string.format('%d,%s', i,v)) end
+		local nPotentialID
+		
+		if bIsSociety then
+			-- if the society doesn't exist in the table already
+			if self.arSocietyChannels[sName] == nil then
+				-- for each of the societies currently in
+				for i, this_society in pairs(societies) do
+					-- if that society matches the name of the channel we're looking for
+					if this_society == sName then
+						--set a potential id based on it's place in line, alphabetically
+						nPotentialID = i+knFudgeCircle
+						--assume that id already exists
+						local bIdExists = true
+						--but no matches have been found yet
+						local bMatch = false
+						--as long as the id already exists, look for matches
+						while bIdExists do
+							--for each society already known
+							for name,id in pairs(self.arSocietyChannels) do
+								-- a match occurs if ANY of the ids match the potential id
+								bMatch = bMatch or (nPotentialID == id)
+							end
+							--if any match was found
+							if bMatch then
+								--increment the potential id and try again
+								nPotentialID = nPotentialID + 1
+							-- if no match was found
+							else
+								-- then the original premise was false and we can stop looking
+								bIdExists = false
+							end
+						end
+						-- set the sociey's id to the discovered potential
+						self.arSocietyChannels[sName] = nPotentialID
+					end
+				end
+				-- return the new id
+				return self.arSocietyChannels[sName]
+			-- the society's id has already been determined
+			else
+				--return the already determined id
+				return self.arSocietyChannels[sName]
+			end
+		end
+
+		if bIsCustom then
+			-- if the custom doesn't exist in the table already
+			if self.arCustomChannels[sName] == nil then
+				self.glog:debug(string.format('ChannelClugde, %s not in arCustomChannels.', sName))
+				-- for each of the customs currently in
+				for i, this_custom in pairs(customs) do
+					self.glog:debug(string.format('ChannelCludge comparing to %s', this_custom))
+					-- if that custom matches the name of the channel we're looking for
+					if this_custom == sName then
+						self.glog:debug('ChannelCludge compare matches sName')
+						--set a potential id based on it's place in line, alphabetically
+						nPotentialID = i+knFudgeCustom
+						self.glog:debug(string.format('ChannelCludge proposed ID is %s', nPotentialID))
+						--assume that id already exists
+						local bIdExists = true
+						--but no matches have been found yet
+						local bMatch = false
+						--as long as the id already exists, look for matches
+						while bIdExists do
+							--for each custom already known
+							if self:CountTable(self.arCustomChannels) ~= 0 then
+								self.glog:debug('arCustomChannels has entries')
+								for name,id in pairs(self.arCustomChannels) do
+									self.glog:debug(string.format('comparing %s, with %s', name, id))
+									-- a match occurs if ANY of the ids match the potential id
+									bMatch = bMatch or (nPotentialID == id)
+									self.glog:debug(string.format('ChannelCludge match found: %s', tostring(bMatch)))
+								end
+								--if any match was found
+								if bMatch then
+									--increment the potential id and try again
+									nPotentialID = nPotentialID + 1
+									self.glog:debug(string.format('ChannelCludge proposed id changed to %s', nPotentialID))
+									bMatch = false
+								-- if no match was found
+								else
+									-- then the original premise was false and we can stop looking
+									bIdExists = false
+								end
+							else
+								bIdExists = false
+							end
+							--self.glog:debug(string.format('ChannelCludge\n name:%s, compare:%s, nP:%s, bE:%s, bM%s', sName, tostring(name), nPotentialID, tostring(bIdExists), tostring(bMatch)))
+						end
+						-- set the custom's id to the discovered potential
+						self.arCustomChannels[sName] = nPotentialID
+						--self.glog:debug(string.format('ChannelCludge %s, %s', self.arCustomChannels[sName], nPotentialID))
+					end
+				end
+				-- return the new id
+				self.glog:debug(string.format('DNE ChannelCludge = %s, %s', sName, tostring(self.arCustomChannels[sName])))
+				return self.arCustomChannels[sName]
+			-- the custom's id has already been determined
+			else
+				--return the already determined id
+				self.glog:debug(string.format('ChannelCludge, %s is in arCustomChannels.', sName))
+				self.glog:debug(string.format('E ChannelCludge = %s, %s', sName, tostring(self.arCustomChannels[sName])))
+				return self.arCustomChannels[sName]
+			end
+		end
+	end
+	
+end
+
+function Killroy:OldChannelCludge(sName,nType)
 	local knFudgeCustom = 40
 	local knFudgeCircle = 50
 	local nCludge = 0
@@ -2655,7 +2897,7 @@ function Killroy:Change_OnChatJoin()
 		if not Killroy then return nil end	
 	
 		ChatSystemLib.PostOnChannel( ChatSystemLib.ChatChannel_Command, String_GetWeaselString(Apollo.GetString("ChatLog_JoinChannel"),  channelJoined:GetName()), "" );
-	
+		
 		-- ChatJoin event is called both on startup and on join.
 	
 		for idx, wndChatWindow in pairs(self.tChatWindows) do
@@ -2667,6 +2909,7 @@ function Killroy:Change_OnChatJoin()
 			
 			--if not tChatData.bCombatLog and tChatData.tViewedChannels[channelJoined:GetUniqueId()] == nil then
 			local nCludge = Killroy:ChannelCludge(channelJoined:GetName(), channelJoined:GetType())
+			ChatSystemLib.PostOnChannel(ChatSystemLib.ChatChannel_Command, tostring(nCludge))
 			if not tChatData.bCombatLog and tChatData.tViewedChannels[nCludge] == nil then
 				--self:HelperAddChannelToAll(channelJoined:GetUniqueId())
 				self:HelperAddChannelToAll(nCludge)
