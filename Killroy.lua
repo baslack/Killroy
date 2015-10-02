@@ -382,7 +382,7 @@ function Killroy:KillChatLogSettings_Check()
 end
 
 function Killroy:arChatColor_Check()
-	self.glog:debug('arChatColor_Check')
+	--self.glog:debug('arChatColor_Check')
 	ChatLog = Apollo.GetAddon("ChatLog")
 	if not ChatLog then return nil end
 	
@@ -593,9 +593,9 @@ function Killroy:OnFixIdTimer()
 end
 
 function Killroy:FixChannelIds()
-	self.glog:debug('FixChannelIds()')
+	--self.glog:debug('FixChannelIds()')
 	if self.bRestored then
-		self.glog:debug('Restored')
+		--self.glog:debug('Restored')
 	end
 	Apollo.AddAddonErrorText('Killroy', 'FixChannelIds')
 	channels = {}
@@ -609,28 +609,28 @@ function Killroy:FixChannelIds()
 	for i, this_chan in ipairs(channels) do
 		local newID = self:ChannelCludge(this_chan:GetName(),this_chan:GetType())
 		local oldID = self:OldChannelCludge(this_chan:GetName(),this_chan:GetType())
-		self.glog:debug(string.format('FixChannels channel: %s, newID: %s, oldID: %s', this_chan:GetName(),newID, oldID))
+		--self.glog:debug(string.format('FixChannels channel: %s, newID: %s, oldID: %s', this_chan:GetName(),newID, oldID))
 		if self.arChatColor[oldID] ~= nil then
 			self.arChatColor[newID] = self.arChatColor[oldID]
 			self.arChatColor[oldID] = nil
-			self.glog:debug(string.format('FixChannels arChatcolor: %s', tostring(self.arChatColor[newID])))
-			self.glog:debug(string.format('FixChannels arChatcolor: %s', tostring(self.arChatColor[oldID])))
+			--self.glog:debug(string.format('FixChannels arChatcolor: %s', tostring(self.arChatColor[newID])))
+			--self.glog:debug(string.format('FixChannels arChatcolor: %s', tostring(self.arChatColor[oldID])))
 		end
 		if self.arRPChannels[oldID] ~= nil then
 			self.arRPChannels[newID] = self.arRPChannels[oldID]
 			self.arRPChannels[oldID] = nil
-			self.glog:debug(string.format('FixChannels arRPChannel: %s', tostring(self.arRPChannels[newID])))
+			--self.glog:debug(string.format('FixChannels arRPChannel: %s', tostring(self.arRPChannels[newID])))
 		end
 		if self.arRPFilterChannels[oldID] ~= nil then
 			self.arRPFilterChannels[newID] = self.arRPFilterChannels[oldID]
 			self.arRPFilterChannels[oldID] = nil
-			self.glog:debug(string.format('FixChannels arRPFilters: %s', tostring(self.arRPFilterChannels[newID])))
+			--self.glog:debug(string.format('FixChannels arRPFilters: %s', tostring(self.arRPFilterChannels[newID])))
 		end
 		for i, tViewed in ipairs(self.tViewed) do
 			if tViewed[oldID] ~= nil then
 				tViewed[newID] = true
 				tViewed[oldID] = nil
-				self.glog:debug(string.format('FixChannels Viewed: %s', tostring(tViewed[newID])))
+				--self.glog:debug(string.format('FixChannels Viewed: %s', tostring(tViewed[newID])))
 			end
 		end
 	end
@@ -1469,7 +1469,7 @@ function Killroy:ChannelCludge(sName,nType)
 			-- for each of the customs currently in
 			local test_these_channels
 			if bIsSociety then
-				self.glog('ChannelCludge: Testing against societies.')
+				--self.glog('ChannelCludge: Testing against societies.')
 				test_these_channels = societies
 			elseif bIsCustom then
 				--self.glog:debug('ChannelCludge: Testing against custom channels.')
