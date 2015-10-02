@@ -335,24 +335,22 @@ function Killroy:ChatWindows_Cleanup()
 				--Apollo.AddAddonErrorText('Killroy', string.format('%s,%s', tostring(i), tostring(v)))
 			--end
 			tViewed = tData.tViewedChannels --rename the viewed channels for convenience
-			if tViewed ~= nil then
-				for j, this_chan in ipairs(tChannels) do --for each channel
-					if tViewed[this_chan:GetUniqueId()] then --check if the channel is viewed by Unique Id
-						tViewed[this_chan:GetUniqueId()] = nil -- eliminate Unique ID Entry
-						tViewed[Killroy:ChannelCludge(this_chan:GetName(), this_chan:GetType())] = true --Add Channel Cludge Entry
-					end
+			for j, this_chan in ipairs(tChannels) do --for each channel
+				if tViewed[this_chan:GetUniqueId()] then --check if the channel is viewed by Unique Id
+					tViewed[this_chan:GetUniqueId()] = nil -- eliminate Unique ID Entry
+					tViewed[Killroy:ChannelCludge(this_chan:GetName(), this_chan:GetType())] = true --Add Channel Cludge Entry
 				end
-				for index, this_viewed in pairs(tViewed) do --for each index in the viewed channels
-					bKillIndex = true --assume the entry is bad
-					for j, this_chan in ipairs(tChannels) do -- for each channel
-						if index == Killroy:ChannelCludge(this_chan:GetName(), this_chan:GetType()) then --check the index to the channel's cludge
-							bKillIndex = false --if it matches, mark the index as a keeper
-						end
-					end
-					if bKillIndex then tViewed[index] = nil end -- if its not marked, remove it
-				end
-				this_wnd:SetData(tData) --now that it's been cleaned, write it back to the window data
 			end
+			for index, this_viewed in pairs(tViewed) do --for each index in the viewed channels
+				bKillIndex = true --assume the entry is bad
+				for j, this_chan in ipairs(tChannels) do -- for each channel
+					if index == Killroy:ChannelCludge(this_chan:GetName(), this_chan:GetType()) then --check the index to the channel's cludge
+						bKillIndex = false --if it matches, mark the index as a keeper
+					end
+				end
+				if bKillIndex then tViewed[index] = nil end -- if its not marked, remove it
+			end
+			this_wnd:SetData(tData) --now that it's been cleaned, write it back to the window data
 		end
 
 		-- Clean ChatLog Master List
@@ -566,6 +564,8 @@ function Killroy:OnRestore(eLevel, tData)
 	
 	if (tData.arViewedChannels ~= nil) then
 		self.tViewed = tData.arViewedChannels
+	else
+		self.tViewed = nil
 	end
 	
 	if (tData.arCustomChannels ~= nil) then
@@ -633,8 +633,6 @@ function Killroy:FixChannelIds()
 			--self.glog:debug(string.format('FixChannels arRPFilters: %s', tostring(self.arRPFilterChannels[newID])))
 		end
 		
-		-- iterate through each window
-		--[[
 		if self.tViewed then
 			Apollo.AddAddonErrorText('Killroy', '631')
 			for i, tViewedChannels  in ipairs(self.tViewed) do
@@ -645,7 +643,6 @@ function Killroy:FixChannelIds()
 				end
 			end
 		end
-		]]--
 	end
 end
 
@@ -1708,7 +1705,11 @@ function Killroy:RestoreChatLogSettings()
 	self:Override_ChatLog_Opacity()
 	self:Override_ChatLog_Fonts()
 	self:Override_ChatLog_Bubbles()
-	if self.tViewed then
+	if self:CountTable(self.tViewed) ~= 0 then
+		--Apollo.AddAddonErrorText('Killroy',tostring(self.tViewed))
+		--for i,v in ipairs(self.tViewed) do
+			--Apollo.AddAddonErrorText('Killroy', string.format('%s,%s', tostring(i), tostring(v)))
+		--end
 		self:ViewedChannelsRestore(self.tViewed)
 	end
 end
@@ -2453,12 +2454,8 @@ function Killroy:Change_AddChannelTypeToList()
 		wndChannelItem:FindChild("TypeName"):SetText(channel:GetName())
 		wndChannelItem:SetData(tTypeData)
 		--wndChannelItem:FindChild("ViewCheck"):SetCheck(tData.tViewedChannels[nId] or false)
-		if tData.tViewedChannels ~= nil then
-			wndChannelItem:FindChild("ViewCheck"):SetCheck(tData.tViewedChannels[nCludge] or false)
-		else
-			wndChannelItem:FindChild("ViewCheck"):SetCheck(false)
-		end
-		
+		wndChannelItem:FindChild("ViewCheck"):SetCheck(tData.tViewedChannels[nCludge] or false)
+	
 		local CCB = wndChannelItem:FindChild("ChannelColorBtn")
 		if self.arChatColor[nCludge] then
 			CCB:SetBGColor(self.arChatColor[nCludge])
