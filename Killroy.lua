@@ -323,28 +323,36 @@ function Killroy:ChatWindows_Cleanup()
 	if not ChatLog then return nil end
 	
 	if ChatLog.tChatWindows then
-
+	
 		tChannels = ChatSystemLib.GetChannels()
 		
 		for i, this_wnd in ipairs(ChatLog.tChatWindows) do -- for each window
+		
 			tData = this_wnd:GetData() --get the windows data
+			--Apollo.AddAddonErrorText('Killroy', 'test')
+			--Apollo.AddAddonErrorText('Killroy', tostring(tData))
+			--for i,v in pairs(tData) do
+				--Apollo.AddAddonErrorText('Killroy', string.format('%s,%s', tostring(i), tostring(v)))
+			--end
 			tViewed = tData.tViewedChannels --rename the viewed channels for convenience
-			for j, this_chan in ipairs(tChannels) do --for each channel
-				if tViewed[this_chan:GetUniqueId()] then --check if the channel is viewed by Unique Id
-					tViewed[this_chan:GetUniqueId()] = nil -- eliminate Unique ID Entry
-					tViewed[Killroy:ChannelCludge(this_chan:GetName(), this_chan:GetType())] = true --Add Channel Cludge Entry
-				end
-			end
-			for index, this_viewed in pairs(tViewed) do --for each index in the viewed channels
-				bKillIndex = true --assume the entry is bad
-				for j, this_chan in ipairs(tChannels) do -- for each channel
-					if index == Killroy:ChannelCludge(this_chan:GetName(), this_chan:GetType()) then --check the index to the channel's cludge
-						bKillIndex = false --if it matches, mark the index as a keeper
+			if tViewed ~= nil then
+				for j, this_chan in ipairs(tChannels) do --for each channel
+					if tViewed[this_chan:GetUniqueId()] then --check if the channel is viewed by Unique Id
+						tViewed[this_chan:GetUniqueId()] = nil -- eliminate Unique ID Entry
+						tViewed[Killroy:ChannelCludge(this_chan:GetName(), this_chan:GetType())] = true --Add Channel Cludge Entry
 					end
 				end
-				if bKillIndex then tViewed[index] = nil end -- if its not marked, remove it
+				for index, this_viewed in pairs(tViewed) do --for each index in the viewed channels
+					bKillIndex = true --assume the entry is bad
+					for j, this_chan in ipairs(tChannels) do -- for each channel
+						if index == Killroy:ChannelCludge(this_chan:GetName(), this_chan:GetType()) then --check the index to the channel's cludge
+							bKillIndex = false --if it matches, mark the index as a keeper
+						end
+					end
+					if bKillIndex then tViewed[index] = nil end -- if its not marked, remove it
+				end
+				this_wnd:SetData(tData) --now that it's been cleaned, write it back to the window data
 			end
-			this_wnd:SetData(tData) --now that it's been cleaned, write it back to the window data
 		end
 
 		-- Clean ChatLog Master List
@@ -557,7 +565,6 @@ function Killroy:OnRestore(eLevel, tData)
 	end
 	
 	if (tData.arViewedChannels ~= nil) then
-		Apollo.AddAddonErrorText('tViewedLoaded')
 		self.tViewed = tData.arViewedChannels
 	end
 	
@@ -597,7 +604,6 @@ function Killroy:FixChannelIds()
 	if self.bRestored then
 		--self.glog:debug('Restored')
 	end
-	Apollo.AddAddonErrorText('Killroy', 'FixChannelIds')
 	channels = {}
 	for i, this_chan in ipairs(self:GetSocieties()) do
 		table.insert(channels, this_chan)
@@ -626,13 +632,20 @@ function Killroy:FixChannelIds()
 			self.arRPFilterChannels[oldID] = nil
 			--self.glog:debug(string.format('FixChannels arRPFilters: %s', tostring(self.arRPFilterChannels[newID])))
 		end
-		for i, tViewed in ipairs(self.tViewed) do
-			if tViewed[oldID] ~= nil then
-				tViewed[newID] = true
-				tViewed[oldID] = nil
-				--self.glog:debug(string.format('FixChannels Viewed: %s', tostring(tViewed[newID])))
+		
+		-- iterate through each window
+		--[[
+		if self.tViewed then
+			Apollo.AddAddonErrorText('Killroy', '631')
+			for i, tViewedChannels  in ipairs(self.tViewed) do
+				if tViewedChannels[oldID] ~= nil then
+					tViewedChannels[newID] = true
+					tViewed[oldID] = nil 
+					--self.glog:debug(string.format('FixChannels Viewed: %s', tostring(tViewed[newID])))
+				end
 			end
 		end
+		]]--
 	end
 end
 
@@ -1469,7 +1482,7 @@ function Killroy:ChannelCludge(sName,nType)
 			-- for each of the customs currently in
 			local test_these_channels
 			if bIsSociety then
-				--self.glog('ChannelCludge: Testing against societies.')
+				--self.glog:debug('ChannelCludge: Testing against societies.')
 				test_these_channels = societies
 			elseif bIsCustom then
 				--self.glog:debug('ChannelCludge: Testing against custom channels.')
@@ -2440,7 +2453,11 @@ function Killroy:Change_AddChannelTypeToList()
 		wndChannelItem:FindChild("TypeName"):SetText(channel:GetName())
 		wndChannelItem:SetData(tTypeData)
 		--wndChannelItem:FindChild("ViewCheck"):SetCheck(tData.tViewedChannels[nId] or false)
-		wndChannelItem:FindChild("ViewCheck"):SetCheck(tData.tViewedChannels[nCludge] or false)
+		if tData.tViewedChannels ~= nil then
+			wndChannelItem:FindChild("ViewCheck"):SetCheck(tData.tViewedChannels[nCludge] or false)
+		else
+			wndChannelItem:FindChild("ViewCheck"):SetCheck(false)
+		end
 		
 		local CCB = wndChannelItem:FindChild("ChannelColorBtn")
 		if self.arChatColor[nCludge] then
