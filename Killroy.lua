@@ -2751,7 +2751,7 @@ function Killroy:Change_HelperGenerateChatMessage()
 		else
 			local strChannel
 			if eChannelTypeOriginal == ChatSystemLib.ChatChannel_Society or eChannelTypeOriginal == ChatSystemLib.ChatChannel_Custom then
-				if self.tPrefs['bChannelLabelExt'] then
+				if Killroy.tPrefs['bChannelLabelExt'] then
 					strChannel = (string.format("%s ", String_GetWeaselString(Apollo.GetString("ChatLog_GuildCommand"), tQueuedMessage.strChannelName, tQueuedMessage.strChannelCommand)))
 					 --String DB removed empty characters at the end of string, so have to hardcode it here.
 				else
