@@ -370,6 +370,10 @@ function Killroy:ChatWindows_Cleanup()
 				if bKillIndex then ChatLog.tAllViewedChannels[index] = nil end -- if its not marked, remove it		
 		end
 		
+		for i,this_wnd in ipairs(ChatLog.tChatWindows) do
+			local these_options = this_wnd:FindChild('OptionsSubForm')
+			these_options:SetStyle('CloseOnExternalClick', false)
+		end
 		self.ChatWindowsTimer:Stop()
 	else
 		return nil
