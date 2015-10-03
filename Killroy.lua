@@ -128,6 +128,7 @@ function Killroy:new(o)
 	if not(self.tPrefs) then
 		self.tPrefs = 
 		{
+			bChatLabelExt = true,
 			bCrossFaction = true,
 			bRPOnly = true,
 			bShowAll = false,
@@ -461,6 +462,7 @@ end
 
 function Killroy:OnConfigure()
 	self.wndMain:FindChild("sVersion"):SetText(self.tPrefs["sVersion"])
+	self.wndMain:FindChild("bChatLabelExt"):SetCheck(self.tPrefs["bChatLabelExt"])
 	self.wndMain:FindChild("bCrossFaction"):SetCheck(self.tPrefs["bCrossFaction"])
 	self.wndMain:FindChild("bRPOnly"):SetCheck(self.tPrefs["bRPOnly"])
 	self.wndMain:FindChild("bShowAll"):SetCheck(self.tPrefs["bShowAll"])
@@ -633,8 +635,8 @@ function Killroy:FixChannelIds()
 			--self.glog:debug(string.format('FixChannels arRPFilters: %s', tostring(self.arRPFilterChannels[newID])))
 		end
 		
-		if self.tViewed then
-			Apollo.AddAddonErrorText('Killroy', '631')
+		if self:CountTable(self.tViewed) ~= 0 then
+			--Apollo.AddAddonErrorText('Killroy', '631')
 			for i, tViewedChannels  in ipairs(self.tViewed) do
 				if tViewedChannels[oldID] ~= nil then
 					tViewedChannels[newID] = true
@@ -2749,7 +2751,12 @@ function Killroy:Change_HelperGenerateChatMessage()
 		else
 			local strChannel
 			if eChannelTypeOriginal == ChatSystemLib.ChatChannel_Society or eChannelTypeOriginal == ChatSystemLib.ChatChannel_Custom then
-				strChannel = (string.format("%s ", String_GetWeaselString(Apollo.GetString("ChatLog_GuildCommand"), tQueuedMessage.strChannelName, tQueuedMessage.strChannelCommand))) --String DB removed empty characters at the end of string, so have to hardcode it here.
+				if self.tPrefs['bChannelLabelExt'] then
+					strChannel = (string.format("%s ", String_GetWeaselString(Apollo.GetString("ChatLog_GuildCommand"), tQueuedMessage.strChannelName, tQueuedMessage.strChannelCommand)))
+					 --String DB removed empty characters at the end of string, so have to hardcode it here.
+				else
+					strChannel = (string.format("%s ", String_GetWeaselString(Apollo.GetString("ChatLog_GuildCommand"), tQueuedMessage.strChannelName)))
+				end
 			else
 				strChannel = String_GetWeaselString(Apollo.GetString("CRB_Brackets_Space"), tQueuedMessage.strChannelName)
 			end
@@ -3114,6 +3121,7 @@ end
 -- when the OK button is clicked
 function Killroy:OnOK()
 	self.wndMain:Close() -- hide the window
+	self.tPrefs["bChatLabelExt"] = (self.wndMain:FindChild("bChatLabelExt"):IsChecked())
 	self.tPrefs["bCrossFaction"] = (self.wndMain:FindChild("bCrossFaction"):IsChecked())
 	self.tPrefs["bRPOnly"] = (self.wndMain:FindChild("bRPOnly"):IsChecked())
 	self.tPrefs["bShowAll"] = (self.wndMain:FindChild("bShowAll"):IsChecked())
@@ -3162,6 +3170,7 @@ end
 -- when the Cancel button is clicked
 function Killroy:OnCancel()
 	self.wndMain:Close() -- hide the window
+	self.wndMain:FindChild("bChatLabelExt"):SetCheck(self.tPrefs["bChatLabelExt"])
 	self.wndMain:FindChild("bCrossFaction"):SetCheck(self.tPrefs["bCrossFaction"])
 	self.wndMain:FindChild("bRPOnly"):SetCheck(self.tPrefs["bRPOnly"])
 	self.wndMain:FindChild("bShowAll"):SetCheck(self.tPrefs["bShowAll"])
