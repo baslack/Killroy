@@ -2751,11 +2751,11 @@ function Killroy:Change_HelperGenerateChatMessage()
 		else
 			local strChannel
 			if eChannelTypeOriginal == ChatSystemLib.ChatChannel_Society or eChannelTypeOriginal == ChatSystemLib.ChatChannel_Custom then
-				if Killroy.tPrefs['bChannelLabelExt'] then
+				if Killroy.tPrefs['bChatLabelExt'] then
 					strChannel = (string.format("%s ", String_GetWeaselString(Apollo.GetString("ChatLog_GuildCommand"), tQueuedMessage.strChannelName, tQueuedMessage.strChannelCommand)))
 					 --String DB removed empty characters at the end of string, so have to hardcode it here.
 				else
-					strChannel = (string.format("%s ", String_GetWeaselString(Apollo.GetString("ChatLog_GuildCommand"), tQueuedMessage.strChannelName)))
+					strChannel = string.format("%s ", String_GetWeaselString(Apollo.GetString("CRB_Brackets_Space"), tQueuedMessage.strChannelName))
 				end
 			else
 				strChannel = String_GetWeaselString(Apollo.GetString("CRB_Brackets_Space"), tQueuedMessage.strChannelName)
