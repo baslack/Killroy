@@ -1077,7 +1077,11 @@ function Killroy:ParseForContext(strText, eChannelType)
 		oocs[first] = last
 		index = last + 1
 	end
-		
+
+	-- code for finding mentions
+	-- this would be the place to add
+	-- code for aliases, if implemented
+			
 	local uPlayer = GameLib.GetPlayerUnit()
 	self.strPlayerName = uPlayer:GetName()
 
@@ -1111,6 +1115,7 @@ function Killroy:ParseForContext(strText, eChannelType)
 		index = last + 1
 	end
 	
+	--setting up parse to return dump
 	buffer = ""
 	index = 1
 
