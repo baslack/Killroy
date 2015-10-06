@@ -20,6 +20,18 @@ require "DatacubeLib"
 -----------------------------------------------------------------------------------------------
 local Killroy = {}
 local GeminiColor
+
+-----------------------------------------------------------------------------------------------
+-- OneVersion Versioning
+-----------------------------------------------------------------------------------------------
+-- for OneVersion see: 
+--   http://www.curse.com/ws-addons/wildstar/231062-oneversion
+-- for Suffix Numbers see:
+--   https://github.com/NexusInstruments/1Version/wiki/OneVersion_ReportAddonInfo-event#suffix-list
+
+local Major, Minor, Patch, Suffix = 1, 6, 0, 0
+local KILLROY_CURRENT_VERSION = string.format("%d.%d.%d", Major, Minor, Patch)
+
 -----------------------------------------------------------------------------------------------
 -- Constants
 -----------------------------------------------------------------------------------------------
@@ -46,7 +58,6 @@ local knChannelListHeight = 500
 local knSaveVersion = 8
 local knMaxRecentEntries = 10
 local kMaxShownEntries = 4
-
 
 local karEvalColors =
 {
@@ -148,7 +159,7 @@ function Killroy:new(o)
 			nOOCBlend = knDefaultOOCBlend,
 			nMentionBlend = knDefaultMentionBlend,
 			bLegacy = true,
-			sVersion = "1-5-19-9",
+			sVersion = KILLROY_CURRENT_VERSION,
 			strFontOption = "CRB_Interface12",
 			strRPFontOption = "CRB_Interface12_I",
 			strBubbleFontOption = "CRB_Interface12",
@@ -204,6 +215,9 @@ function Killroy:new(o)
 	
 	-- global state for skipping the next animated emote
 	self.bSkipAnimatedEmote = false
+
+	-- report Addon Version to OneVersion
+	Event_FireGenericEvent("OneVersion_ReportAddonInfo", "Killroy", Major, Minor, Patch, Suffix, false)
 
     return o
 end
@@ -584,7 +598,7 @@ function Killroy:OnRestore(eLevel, tData)
 		for i,v in pairs(tData.arSocietyChannels) do
 			self.arSocietyChannels[i] = v
 		end
-	end	self.tPrefs["sVersion"] = "1-5-19-9"
+	end	self.tPrefs["sVersion"] = KILLROY_CURRENT_VERSION
 	self.tPrefs["bCustomChatColors"] = true
 	
 	if (tData.tChatLogPrefs ~= nil) then
@@ -953,7 +967,7 @@ function Killroy:Command(...)
 										nOOCBlend = knDefaultOOCBlend,
 										nMentionBlend = knDefaultMentionBlend,
 										bLegacy = true,
-										sVersion = "1-5-19-9"
+										sVersion = KILLROY_CURRENT_VERSION
 									}
 					chanCommand = self:GetChannelByName("Command")
 					self:SetupRPChannels()
