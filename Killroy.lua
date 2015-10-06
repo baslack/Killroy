@@ -148,7 +148,7 @@ function Killroy:new(o)
 			nOOCBlend = knDefaultOOCBlend,
 			nMentionBlend = knDefaultMentionBlend,
 			bLegacy = true,
-			sVersion = "1-5-19-8",
+			sVersion = "1-5-19-9",
 			strFontOption = "CRB_Interface12",
 			strRPFontOption = "CRB_Interface12_I",
 			strBubbleFontOption = "CRB_Interface12",
@@ -584,7 +584,7 @@ function Killroy:OnRestore(eLevel, tData)
 		for i,v in pairs(tData.arSocietyChannels) do
 			self.arSocietyChannels[i] = v
 		end
-	end	self.tPrefs["sVersion"] = "1-5-19-8"
+	end	self.tPrefs["sVersion"] = "1-5-19-9"
 	self.tPrefs["bCustomChatColors"] = true
 	
 	if (tData.tChatLogPrefs ~= nil) then
@@ -953,7 +953,7 @@ function Killroy:Command(...)
 										nOOCBlend = knDefaultOOCBlend,
 										nMentionBlend = knDefaultMentionBlend,
 										bLegacy = true,
-										sVersion = "1-5-19-8"
+										sVersion = "1-5-19-9"
 									}
 					chanCommand = self:GetChannelByName("Command")
 					self:SetupRPChannels()

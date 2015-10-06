@@ -1,7 +1,7 @@
 Killroy
 =======
 
-Current Release: 1-5-18
+Current Release: 1-5-19-8
 
 [Manual available here!](http://www.wildstar-roleplay.com/forum/m/11410152/viewthread/16453255-documentation-killroy-manual/page/1)
 
