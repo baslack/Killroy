@@ -216,9 +216,6 @@ function Killroy:new(o)
 	-- global state for skipping the next animated emote
 	self.bSkipAnimatedEmote = false
 
-	-- report Addon Version to OneVersion
-	Event_FireGenericEvent("OneVersion_ReportAddonInfo", "Killroy", Major, Minor, Patch, Suffix, false)
-
     return o
 end
 
@@ -242,6 +239,9 @@ function Killroy:OnLoad()
 	self.xmlDoc = XmlDoc.CreateFromFile("Killroy.xml")
 	self.xmlDoc:RegisterCallback("OnDocumentLoaded", self)
 	Apollo.LoadSprites("KIL.xml", "KIL")
+
+	-- report Addon Version to OneVersion
+	Event_FireGenericEvent("OneVersion_ReportAddonInfo", "Killroy", Major, Minor, Patch, Suffix, false)
 end
 
 function Killroy:OnDocumentLoaded()
