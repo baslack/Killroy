@@ -29,7 +29,7 @@ local GeminiColor
 -- for Suffix Numbers see:
 --   https://github.com/NexusInstruments/1Version/wiki/OneVersion_ReportAddonInfo-event#suffix-list
 
-local Major, Minor, Patch, Suffix = 1, 7, 0, 0
+local Major, Minor, Patch, Suffix = 1, 7, 1, 0
 local KILLROY_CURRENT_VERSION = string.format("%d.%d.%d", Major, Minor, Patch)
 
 -----------------------------------------------------------------------------------------------
@@ -188,6 +188,7 @@ function Killroy:new(o)
 		self.arCustomChannels = {}
 		self.arSocietyChannels = {}
 		self.tViewed = {}
+		--self.strAliases = ""
 		
 	else
 		self.tColorBuffer = 
@@ -259,7 +260,8 @@ function Killroy:OnDocumentLoaded()
 	self.wndWarn:Show(false)
 	
 	-- if this hasn't been restored, set it to the default
-	if self.strAliases == nil then
+	if not(self.strAliases) then
+		--Apollo.AddAddonErrorText(self.wndMain:FindChild("Aliases"):GetText())
 		self.strAliases = self.wndMain:FindChild("Aliases"):GetText()
 	end
 	self:ParseAliases()
