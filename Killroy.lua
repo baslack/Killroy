@@ -29,15 +29,13 @@ local GeminiColor
 -- for Suffix Numbers see:
 --   https://github.com/NexusInstruments/1Version/wiki/OneVersion_ReportAddonInfo-event#suffix-list
 
-local Major, Minor, Patch, Suffix = 1, 6, 0, 0
+local Major, Minor, Patch, Suffix = 1, 7, 1, 0
 local KILLROY_CURRENT_VERSION = string.format("%d.%d.%d", Major, Minor, Patch)
 
 -----------------------------------------------------------------------------------------------
 -- Constants
 -----------------------------------------------------------------------------------------------
 -- e.g. local kiExampleVariableMax = 999
-
-local knCutoffVersion = 1.518
 
 local kcrInvalidColor = ApolloColor.new("InvalidChat")
 local kcrValidColor = ApolloColor.new("white")
@@ -190,6 +188,7 @@ function Killroy:new(o)
 		self.arCustomChannels = {}
 		self.arSocietyChannels = {}
 		self.tViewed = {}
+		--self.strAliases = ""
 		
 	else
 		self.tColorBuffer = 
@@ -259,6 +258,13 @@ function Killroy:OnDocumentLoaded()
 	
 	self.wndWarn = Apollo.LoadForm(self.xmlDoc, "Warning", nil, self)
 	self.wndWarn:Show(false)
+	
+	-- if this hasn't been restored, set it to the default
+	if not(self.strAliases) then
+		--Apollo.AddAddonErrorText(self.wndMain:FindChild("Aliases"):GetText())
+		self.strAliases = self.wndMain:FindChild("Aliases"):GetText()
+	end
+	self:ParseAliases()
 
 	--register commands and actions
 	Apollo.RegisterSlashCommand("killroy", "OnKillroyOn", self)
@@ -502,6 +508,9 @@ function Killroy:OnConfigure()
 	self.tRFBuffer["nEmoteRange"] = self.tPrefs["nEmoteRange"]
 	self.wndMain:FindChild("nFalloff"):SetValue(self.tPrefs["nFalloff"])
 	self.tRFBuffer["nFalloff"] = self.tPrefs["nFalloff"]
+	if self.strAliases then
+		self.wndMain:FindChild("Aliases"):SetText(self.strAliases)
+	end
 	
 	--ChatLog Options Override Section
 	self.wndMain:FindChild("bProfanityFilter"):SetCheck(self.tChatLogPrefs["bProfanityFilter"])
@@ -549,7 +558,8 @@ function Killroy:OnSave(eLevel)
 				arRPFilterChannels = self.arRPFilterChannels,
 				arViewedChannels = self:ViewedChannelsSave(),
 				arCustomChannels = self.arCustomChannels,
-				arSocietyChannels = self.arSocietyChannels
+				arSocietyChannels = self.arSocietyChannels,
+				strAliases = self.strAliases,
 				}
 	
 	else
@@ -563,6 +573,10 @@ function Killroy:OnRestore(eLevel, tData)
 		for i,v in pairs(tData.tPrefs) do
 			self.tPrefs[i] = v
 		end
+	end
+	
+	if tData.strAliases then
+		self.strAliases = tData.strAliases
 	end
 	
 	if (tData.arChatColor ~= nil) then
@@ -1010,6 +1024,19 @@ function Killroy:Command(...)
 	end
 end
 
+function Killroy:ParseAliases()
+	local strPattern = "%a+;"
+	self.tAliases = {}
+	for this_alias in string.gmatch(self.strAliases, strPattern) do
+		table.insert(self.tAliases, string.lower(string.sub(this_alias, 1, string.len(this_alias) - 1)))
+	end
+	if self:CountTable(self.tAliases) == 0 then
+		return nil
+	else
+		return self.tAliases
+	end
+end
+
 function Killroy:ParseForAnimatedEmote(strText)
 	local strTextClean
 	local strEmbeddedEmote
@@ -1070,6 +1097,7 @@ function Killroy:ParseForContext(strText, eChannelType)
 	oocs = {}
     mentionsFirst = {}
     mentionsLast = {}
+	mentions = {}
 	
 	index = 1
 	for emote in strText:gmatch("%b**") do
@@ -1114,7 +1142,24 @@ function Killroy:ParseForContext(strText, eChannelType)
 	firstName = string.lower(firstName)
 	lastName = string.lower(lastName)	
 	strLower = string.lower(strText)
-
+	
+	local tMentionTests = {}
+	for i,v in ipairs(self.tAliases) do
+		table.insert(tMentionTests, v)
+	end
+	table.insert(tMentionTests, firstName)
+	table.insert(tMentionTests, lastName)
+	
+	for i, this_mentiontest in ipairs(tMentionTests) do
+		index = 1
+		for this_mention in strLower:gmatch('%f[%a]'..this_mentiontest..'%f[%A]') do
+			first, last = strLower:find(this_mention, index, true)
+			mentions[first] = last
+			index = last + 1
+		end
+	end
+	
+	--[[ 
 	index = 1
 	for mention in strLower:gmatch(firstName) do
 		first, last = strLower:find(mention, index, true)
@@ -1128,12 +1173,21 @@ function Killroy:ParseForContext(strText, eChannelType)
 		mentionsLast[first] = last
 		index = last + 1
 	end
+	]]--
 	
 	--setting up parse to return dump
 	buffer = ""
 	index = 1
 
 	while index <= strText:len() do
+		if mentions[index] then
+			if buffer then
+				table.insert(parsedText, {buffer, tagByChan()})
+				buffer = ""
+			end
+			table.insert(parsedText, {strText:sub(index, mentions[index]), tagMention})
+			index = mentions[index] + 1
+		--[[
 		if mentionsFirst[index] then
 			if buffer then
 				table.insert(parsedText, {buffer, tagByChan()})
@@ -1148,6 +1202,7 @@ function Killroy:ParseForContext(strText, eChannelType)
 			end
 			table.insert(parsedText, {strText:sub(index, mentionsLast[index]), tagMention})
 			index = mentionsLast[index] + 1
+		]]--
 		elseif oocs[index] then
 			if buffer then
 				table.insert(parsedText, {buffer, tagByChan()})
@@ -3163,6 +3218,9 @@ function Killroy:OnOK()
 	self.tPrefs["nEmoteBlend"] = self.tBlendBuffer["nEmoteBlend"]
 	self.tPrefs["nOOCBlend"] = self.tBlendBuffer["nOOCBlend"]
 	self.tPrefs["nMentionBlend"] = self.tBlendBuffer["nMentionBlend"]
+	self.strAliases = self.wndMain:FindChild("Aliases"):GetText()
+	self:ParseAliases()
+	
 	--ChatLog Overrides
 	self.tChatLogPrefs["bProfanityFilter"] = self.wndMain:FindChild("bProfanityFilter"):IsChecked()
 	self:Override_ChatLog_ProfanityFilter()
@@ -3212,6 +3270,7 @@ function Killroy:OnCancel()
 	self.tBlendBuffer["nEmoteBlend"] = self.tPrefs["nEmoteBlend"]
 	self.tBlendBuffer["nOOCBlend"] = self.tPrefs["nOOCBlend"]
 	self.tBlendBuffer["nMentionBlend"] = self.tPrefs["nMentionBlend"]
+	self.wndMain:FindChild("Aliases"):SetText(self.strAliases)
 	--ChatLog Overrides
 	self.wndMain:FindChild("bProfanityFilter"):SetCheck(self.tChatLogPrefs["bProfanityFilter"])
 	self:Override_ChatLog_ProfanityFilter()
