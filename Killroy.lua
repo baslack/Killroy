@@ -650,18 +650,18 @@ function Killroy:FixChannelIds()
 		local newID = self:ChannelCludge(this_chan:GetName(),this_chan:GetType())
 		local oldID = self:OldChannelCludge(this_chan:GetName(),this_chan:GetType())
 		--self.glog:debug(string.format('FixChannels channel: %s, newID: %s, oldID: %s', this_chan:GetName(),newID, oldID))
-		if self.arChatColor[oldID] ~= nil then
+		if self.arChatColor[oldID] ~= nil and self.arChatColor[newID] == nil then
 			self.arChatColor[newID] = self.arChatColor[oldID]
 			self.arChatColor[oldID] = nil
 			--self.glog:debug(string.format('FixChannels arChatcolor: %s', tostring(self.arChatColor[newID])))
 			--self.glog:debug(string.format('FixChannels arChatcolor: %s', tostring(self.arChatColor[oldID])))
 		end
-		if self.arRPChannels[oldID] ~= nil then
+		if self.arRPChannels[oldID] ~= nil and self.arRPChannels[newID] == nil then
 			self.arRPChannels[newID] = self.arRPChannels[oldID]
 			self.arRPChannels[oldID] = nil
 			--self.glog:debug(string.format('FixChannels arRPChannel: %s', tostring(self.arRPChannels[newID])))
 		end
-		if self.arRPFilterChannels[oldID] ~= nil then
+		if self.arRPFilterChannels[oldID] ~= nil and self.arRPFilterChannels[newID] == nil then
 			self.arRPFilterChannels[newID] = self.arRPFilterChannels[oldID]
 			self.arRPFilterChannels[oldID] = nil
 			--self.glog:debug(string.format('FixChannels arRPFilters: %s', tostring(self.arRPFilterChannels[newID])))
