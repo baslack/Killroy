@@ -143,6 +143,8 @@ function Killroy:new(o)
 			bShowAll = false,
 			bFormatChat = true,
 			bRangeFilter = true,
+			bMentionsName = true,			
+			bMentionsAlias = true,
 			bCustomChatColors = true,
 			nSayRange = knDefaultSayRange,
 			nEmoteRange = knDefaultEmoteRange,
@@ -508,6 +510,8 @@ function Killroy:OnConfigure()
 	self.tRFBuffer["nEmoteRange"] = self.tPrefs["nEmoteRange"]
 	self.wndMain:FindChild("nFalloff"):SetValue(self.tPrefs["nFalloff"])
 	self.tRFBuffer["nFalloff"] = self.tPrefs["nFalloff"]
+	self.wndMain:FindChild("bMentionsName"):SetCheck(self.tPrefs["bMentionsName"])
+	self.wndMain:FindChild("bMentionsAlias"):SetCheck(self.tPrefs["bMentionsAlias"])
 	if self.strAliases then
 		self.wndMain:FindChild("Aliases"):SetText(self.strAliases)
 	end
@@ -515,6 +519,8 @@ function Killroy:OnConfigure()
 	--ChatLog Options Override Section
 	self.wndMain:FindChild("bProfanityFilter"):SetCheck(self.tChatLogPrefs["bProfanityFilter"])
 	self.wndMain:FindChild("bTimestamp"):SetCheck(self.tChatLogPrefs["bShowTimestamp"])
+	self.wndMain:FindChild("bMentionsName"):SetCheck(self.tChatLogPrefs["bMentionsName"])
+	self.wndMain:FindChild("bMentionsAlias"):SetCheck(self.tChatLogPrefs["bMentionsAlias"])
 	self.wndMain:FindChild("bSaveToLog"):SetCheck(self.tChatLogPrefs["bSaveToLog"])
 	self.wndMain:FindChild("bShowChannel"):SetCheck(self.tChatLogPrefs["bShowChannel"])
 	self.wndMain:FindChild("bMouseFade"):SetCheck(self.tChatLogPrefs["bEnableBGFade"])
@@ -967,6 +973,8 @@ function Killroy:Command(...)
 										bRPOnly = true,
 										bFormatChat = true,
 										bRangeFilter = true,
+										bMentionsName = true,
+										bMentionsAlias = true,
 										bCustomChatColors = true,
 										nSayRange = knDefaultSayRange,
 										nEmoteRange = knDefaultEmoteRange,
@@ -1144,11 +1152,17 @@ function Killroy:ParseForContext(strText, eChannelType)
 	strLower = string.lower(strText)
 	
 	local tMentionTests = {}
-	for i,v in ipairs(self.tAliases) do
-		table.insert(tMentionTests, v)
+	
+	if self.bMentionsAlias then
+		for i,v in ipairs(self.tAliases) do
+			table.insert(tMentionTests, v)
+		end
 	end
-	table.insert(tMentionTests, firstName)
-	table.insert(tMentionTests, lastName)
+	
+	if self.bMentionsName then
+		table.insert(tMentionTests, firstName)
+		table.insert(tMentionTests, lastName)
+	end
 	
 	for i, this_mentiontest in ipairs(tMentionTests) do
 		index = 1
@@ -1766,6 +1780,8 @@ function Killroy:CaptureChatLogSettings()
 	
 	self.tChatLogPrefs["bProfanityFilter"] = ChatLog.bProfanityFilter
 	self.tChatLogPrefs["bShowTimestamp"] = ChatLog.bShowTimestamp
+	self.tChatLogPrefs["bMentionsName"] = ChatLog.bMentionsName	
+	self.tChatLogPrefs["bMentionsAlias"] = ChatLog.bMentionsAlias
 	self.tChatLogPrefs["bShowChannel"] = ChatLog.bShowChannel
 	self.tChatLogPrefs["bSaveToLog"] = ChatLog.bSaveToLog
 	self.tChatLogPrefs["bEnableBGFade"] = ChatLog.bEnableBGFade
@@ -3218,6 +3234,8 @@ function Killroy:OnOK()
 	self.tPrefs["nEmoteBlend"] = self.tBlendBuffer["nEmoteBlend"]
 	self.tPrefs["nOOCBlend"] = self.tBlendBuffer["nOOCBlend"]
 	self.tPrefs["nMentionBlend"] = self.tBlendBuffer["nMentionBlend"]
+	self.tPrefs["bMentionsName"] = (self.wndMain:FindChild("bMentionsName"):IsChecked())	
+	self.tPrefs["bMentionsAlias"] = (self.wndMain:FindChild("bMentionsAlias"):IsChecked())
 	self.strAliases = self.wndMain:FindChild("Aliases"):GetText()
 	self:ParseAliases()
 	
@@ -3270,6 +3288,8 @@ function Killroy:OnCancel()
 	self.tBlendBuffer["nEmoteBlend"] = self.tPrefs["nEmoteBlend"]
 	self.tBlendBuffer["nOOCBlend"] = self.tPrefs["nOOCBlend"]
 	self.tBlendBuffer["nMentionBlend"] = self.tPrefs["nMentionBlend"]
+	self.wndMain:FindChild("bMentionsName"):SetCheck(self.tPrefs["bMentionsName"])
+	self.wndMain:FindChild("bMentionsAlias"):SetCheck(self.tPrefs["bMentionsAlias"])
 	self.wndMain:FindChild("Aliases"):SetText(self.strAliases)
 	--ChatLog Overrides
 	self.wndMain:FindChild("bProfanityFilter"):SetCheck(self.tChatLogPrefs["bProfanityFilter"])
