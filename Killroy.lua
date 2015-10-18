@@ -29,7 +29,7 @@ local GeminiColor
 -- for Suffix Numbers see:
 --   https://github.com/NexusInstruments/1Version/wiki/OneVersion_ReportAddonInfo-event#suffix-list
 
-local Major, Minor, Patch, Suffix = 1, 7, 1, 0
+local Major, Minor, Patch, Suffix = 1, 8, 0, 0
 local KILLROY_CURRENT_VERSION = string.format("%d.%d.%d", Major, Minor, Patch)
 
 -----------------------------------------------------------------------------------------------
@@ -144,6 +144,7 @@ function Killroy:new(o)
 			bFormatChat = true,
 			bRangeFilter = true,
 			bCustomChatColors = true,
+			bShowMentions = true,
 			nSayRange = knDefaultSayRange,
 			nEmoteRange = knDefaultEmoteRange,
 			nFalloff = knDefaultFalloff,
@@ -1159,50 +1160,17 @@ function Killroy:ParseForContext(strText, eChannelType)
 		end
 	end
 	
-	--[[ 
-	index = 1
-	for mention in strLower:gmatch(firstName) do
-		first, last = strLower:find(mention, index, true)
-		mentionsFirst[first] = last
-		index = last + 1
-	end
-
-	index = 1
-	for mention in strLower:gmatch(lastName ) do
-		first, last = strLower:find(mention, index, true)
-		mentionsLast[first] = last
-		index = last + 1
-	end
-	]]--
-	
-	--setting up parse to return dump
 	buffer = ""
 	index = 1
 
 	while index <= strText:len() do
-		if mentions[index] then
+		if mentions[index] and self.tPrefs['bShowMentions'] then
 			if buffer then
 				table.insert(parsedText, {buffer, tagByChan()})
 				buffer = ""
 			end
 			table.insert(parsedText, {strText:sub(index, mentions[index]), tagMention})
 			index = mentions[index] + 1
-		--[[
-		if mentionsFirst[index] then
-			if buffer then
-				table.insert(parsedText, {buffer, tagByChan()})
-				buffer = ""
-			end
-			table.insert(parsedText, {strText:sub(index, mentionsFirst[index]), tagMention})
-			index = mentionsFirst[index] + 1
-		elseif mentionsLast[index] then
-			if buffer then
-				table.insert(parsedText, {buffer, tagByChan()})
-				buffer = ""
-			end
-			table.insert(parsedText, {strText:sub(index, mentionsLast[index]), tagMention})
-			index = mentionsLast[index] + 1
-		]]--
 		elseif oocs[index] then
 			if buffer then
 				table.insert(parsedText, {buffer, tagByChan()})
