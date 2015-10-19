@@ -142,7 +142,7 @@ function Killroy:new(o)
 	if not(self.tPrefs) then
 		self.tPrefs = 
 		{
-			bChatLabelExt = true,
+			--bChatLabelExt = true,
 			bCrossFaction = true,
 			bRPOnly = true,
 			bShowAll = false,
@@ -196,6 +196,7 @@ function Killroy:new(o)
 		self.arCustomChannels = {}
 		self.arSocietyChannels = {}
 		self.tViewed = {}
+		self.tChannelAliases = {}
 		--self.strAliases = ""
 		
 	else
@@ -255,7 +256,7 @@ function Killroy:OnDocumentLoaded()
 	GeminiColor = Apollo.GetPackage("GeminiColor").tPackage
 	GeminiLogging = Apollo.GetPackage("Gemini:Logging-1.2").tPackage
 	self.glog = GeminiLogging:GetLogger({
-		level = GeminiLogging.DEBUG,
+		level = GeminiLogging.FATAL,
         pattern = "%d %n %c %l - %m",
         appender = "GeminiConsole"
     })
@@ -302,6 +303,7 @@ function Killroy:OnDocumentLoaded()
 	self:Append_OnChannelColorBtn()
 	self:Append_OnRPChannel()
 	self:Append_OnRPFilterChanged()
+	self:Append_OnChannelAliasChanged()
 	self:Change_OnViewCheck()
 	self:Change_NewChatWindow()
 	self:Change_OnInputChanged()
@@ -528,13 +530,13 @@ end
 
 function Killroy:OnConfigure()
 	self.wndMain:FindChild("sVersion"):SetText(self.tPrefs["sVersion"])
-	self.wndMain:FindChild("bChatLabelExt"):SetCheck(self.tPrefs["bChatLabelExt"])
+	--self.wndMain:FindChild("bChatLabelExt"):SetCheck(self.tPrefs["bChatLabelExt"])
 	self.wndMain:FindChild("bCrossFaction"):SetCheck(self.tPrefs["bCrossFaction"])
 	self.wndMain:FindChild("bRPOnly"):SetCheck(self.tPrefs["bRPOnly"])
 	self.wndMain:FindChild("bShowAll"):SetCheck(self.tPrefs["bShowAll"])
 	self.wndMain:FindChild("bFormatChat"):SetCheck(self.tPrefs["bFormatChat"])
 	self.wndMain:FindChild("bShowMentions"):SetCheck(self.tPrefs["bShowMentions"])
-	self.wndMain:FindChild("bHideChatWindowsInCombat"):SetCheck(self.tPrefs["bHideChatWindwosInCombat"])
+	self.wndMain:FindChild("bHideChatWindowsInCombat"):SetCheck(self.tPrefs["bHideChatWindowsInCombat"])
 	self.wndMain:FindChild("bRangeFilter"):SetCheck(self.tPrefs["bRangeFilter"])
 	self.wndMain:FindChild("bUseOcclusion"):SetCheck(self.tPrefs["bUseOcclusion"])
 	self.wndMain:FindChild("setEmoteColor"):SetBGColor(self.tPrefs["kstrEmoteColor"])
@@ -610,6 +612,11 @@ function Killroy:OnSave(eLevel)
 				}
 	-- comment this out to disable saving
 	elseif (eLevel == GameLib.CodeEnumAddonSaveLevel.Character) then
+		for i,v in pairs(self.tChannelAliases) do
+			if self.tChannelAliases[i] == "" then
+				self.tChannelAliases[i] = nil
+			end
+		end
 		return {
 				arChatColor = self.arChatColor,
 				arRPChannels = self.arRPChannels,
@@ -618,6 +625,7 @@ function Killroy:OnSave(eLevel)
 				arCustomChannels = self.arCustomChannels,
 				arSocietyChannels = self.arSocietyChannels,
 				strAliases = self.strAliases,
+				tChannelAliases = self.tChannelAliases
 				}
 	
 	else
@@ -632,11 +640,22 @@ function Killroy:OnRestore(eLevel, tData)
 			self.tPrefs[i] = v
 		end
 	end
-	
+		
 	if not(self.tPrefs['nChatLabels']) then
 		self.tPrefs['nChatLabels'] = enum_ChatLabelsExt
 	end
 	
+	if self.tPrefs['bChatLabelExt'] then
+		self.tPrefs['bChatLabelExt'] = nil
+	end
+
+	if tData.tChannelAliases then
+		self.tChannelAliases = {}
+		for i,v in pairs(tData.tChannelAliases) do
+			self.tChannelAliases[i] = v
+		end
+	end 
+		
 	if tData.strAliases then
 		self.strAliases = tData.strAliases
 	end
@@ -2617,6 +2636,12 @@ function Killroy:Change_AddChannelTypeToList()
 		else
 			ShowAllBtn:SetCheck(true)
 		end
+		
+		if Killroy.tChannelAliases[nCludge] then
+			if Killroy.tChannelAliases[nCludge] ~= '' then
+				wndChannelItem:FindChild('strChannelAlias'):SetText(Killroy.tChannelAliases[nCludge] .. ';')
+			end
+		end
 	end
 end
 
@@ -2890,6 +2915,9 @@ function Killroy:Change_HelperGenerateChatMessage()
 			elseif Killroy.tPrefs['nChatLabels'] == enum_ChatLabelsAbr then
 				local a_chan = Killroy:GetChannelByName(tQueuedMessage.strChannelName)
 				local strCommand = a_chan:GetAbbreviation()
+				if not(strCommand) or strCommand == "" then
+					strCommand = tQueuedMessage.strChannelName
+				end
 				--strChannel = string.format("%s ", String_GetWeaselString(Apollo.GetString("CRB_Brackets_Space"), tQueuedMessage.strChannelCommand))
 				strChannel = string.format("%s ", String_GetWeaselString(Apollo.GetString("CRB_Brackets_Space"), strCommand))
 			else
@@ -3186,6 +3214,17 @@ function Killroy:Change_OnChatInputReturn()
 							tInput.strMessage = Apollo.GetString("ChatLog_RPMarker") .. tInput.strMessage
 						end
 					end
+					
+					--channel aliases
+					if Killroy.tChannelAliases[nCludge] then
+						Killroy.glog:debug("into insert logic")
+						Killroy.glog:debug(nCludge)
+						if Killroy.tChannelAliases[nCludge] ~= "" then
+							Killroy.glog:debug(Killroy.tChannelAliases[nCludge])
+							tInput.strMessage = string.format("(%s) - ", Killroy.tChannelAliases[nCludge]) .. tInput.strMessage
+							Killroy.glog:debug(tInput.strMessage)
+						end
+					end
 
 					bViewedChannel = self:VerifyChannelVisibility(channelCurrent, tInput, wndForm)
 				end
@@ -3256,7 +3295,7 @@ end
 -- when the OK button is clicked
 function Killroy:OnOK()
 	self.wndMain:Close() -- hide the window
-	self.tPrefs["bChatLabelExt"] = (self.wndMain:FindChild("bChatLabelExt"):IsChecked())
+	--self.tPrefs["bChatLabelExt"] = (self.wndMain:FindChild("bChatLabelExt"):IsChecked())
 	self.tPrefs["bCrossFaction"] = (self.wndMain:FindChild("bCrossFaction"):IsChecked())
 	self.tPrefs["bRPOnly"] = (self.wndMain:FindChild("bRPOnly"):IsChecked())
 	self.tPrefs["bShowAll"] = (self.wndMain:FindChild("bShowAll"):IsChecked())
@@ -3318,7 +3357,7 @@ end
 -- when the Cancel button is clicked
 function Killroy:OnCancel()
 	self.wndMain:Close() -- hide the window
-	self.wndMain:FindChild("bChatLabelExt"):SetCheck(self.tPrefs["bChatLabelExt"])
+	--self.wndMain:FindChild("bChatLabelExt"):SetCheck(self.tPrefs["bChatLabelExt"])
 	self.wndMain:FindChild("bCrossFaction"):SetCheck(self.tPrefs["bCrossFaction"])
 	self.wndMain:FindChild("bRPOnly"):SetCheck(self.tPrefs["bRPOnly"])
 	self.wndMain:FindChild("bShowAll"):SetCheck(self.tPrefs["bShowAll"])
@@ -3553,6 +3592,45 @@ function Killroy:Append_OnRPFilterChanged()
 			Killroy.arRPFilterChannels[nChannel] = enum_RPOnly
 		else
 			Killroy.arRPFilterChannels[nChannel] = nil
+		end
+	end
+end
+
+function Killroy:Append_OnChannelAliasChanged()
+	--append this method to ChatLog so that it when it's ChatType lines
+	--get modified, it catches the appropriate event
+	
+	ChatLog = Apollo.GetAddon("ChatLog")
+	if not ChatLog then return nil end
+	self.glog:debug("Event Handlers")
+	Apollo.RegisterEventHandler("OnChannelAliasChanged", OnChannelAliasChanged, ChatLog)
+	--Apollo.RegisterEventHandler("EditBoxReturn", OnChannelAliasChanged, ChatLog)
+
+	function ChatLog:OnChannelAliasChanged( wndHandler, wndControl, strText )
+		Killroy = Apollo.GetAddon("Killroy")
+		if not(Killroy) then return nil end
+		Killroy.glog:debug("Event Fired")
+
+		if wndControl:GetName() == 'strChannelAlias' then
+			Killroy.glog:debug("into logic")
+			--update the alias table
+			--get the channel id from the chatline's data
+			wndChatType = wndControl:GetParent()
+			tData = wndChatType:GetData()
+			nChannel = tData['nCludge']
+			Killroy.glog:debug(nChannel)
+			--put the alias into a table that the input function can pull from
+			local strSanitized, index = "", 1
+			for this_word in strText:gmatch('%w+;') do
+				--if it's the first terminated word
+				if index == 1 then
+					--strip the termination character
+					strSanitized = this_word:sub(1, this_word:len()-1)
+				end
+				index = index + 1
+			end
+			Killroy.glog:debug(strSanitized)
+			Killroy.tChannelAliases[nChannel] = strSanitized
 		end
 	end
 end
