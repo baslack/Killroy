@@ -126,6 +126,10 @@ local enum_NoRP = 1
 local enum_RPOnly = 2
 local enum_ShowAll = 3
 
+local enum_ChatLabelsAbr = 1
+local enum_ChatLabelsReg = 2
+local enum_ChatLabelsExt = 3
+
 -----------------------------------------------------------------------------------------------
 -- Initialization
 -----------------------------------------------------------------------------------------------
@@ -146,6 +150,8 @@ function Killroy:new(o)
 			bRangeFilter = true,
 			bCustomChatColors = true,
 			bShowMentions = true,
+			bHideChatWindowsInCombat = false,
+			nChatLabels = enum_ChatLabelsExt,
 			nSayRange = knDefaultSayRange,
 			nEmoteRange = knDefaultEmoteRange,
 			nFalloff = knDefaultFalloff,
@@ -283,6 +289,7 @@ function Killroy:OnDocumentLoaded()
 	Apollo.RegisterEventHandler("InterfaceMenuListHasLoaded", "OnInterfaceMenuListHasLoaded", self)
 	Apollo.RegisterEventHandler("ToggleKillroy", "OnKillroyOn", self)
 	Apollo.RegisterEventHandler("ChatLeave", "OnChatLeave", self)
+	Apollo.RegisterEventHandler("UnitEnteredCombat", "OnUnitEnteredCombat", self)
 	
 	-- replace ChatLogFunctions
 	self:Change_OnChatJoin()
@@ -323,6 +330,39 @@ end
 -- Killroy Functions
 -----------------------------------------------------------------------------------------------
 -- Define general functions here
+
+local tIsVisible = {}
+
+function Killroy:OnUnitEnteredCombat(unit,bInCombat)
+	ChatLog = Apollo.GetAddon("ChatLog")
+	if not(ChatLog) then return nil end
+	
+	if self.tPrefs['bHideChatWindowsInCombat'] then
+		strOut = '%s, in combat: %s'
+		--self.glog:debug(strOut:format(unit:GetName(), tostring(bInCombat)))
+		
+		if GameLib.GetPlayerUnit():GetName() == unit:GetName() and bInCombat then
+			-- hide the windows
+			for i,this_wnd in ipairs(ChatLog.tChatWindows) do
+				tIsVisible[i] = this_wnd:IsVisible()
+				if tIsVisible[i] then
+					--self.glog:debug(string.format('hid: %d',i))
+					this_wnd:Show(false)
+				end
+			end
+		elseif GameLib.GetPlayerUnit():GetName() == unit:GetName() and (not(bInCombat)) then
+			--self.glog:debug('out of combat')
+			for i,this_wnd in ipairs(ChatLog.tChatWindows) do
+				--self.glog:debug(i)
+				--self.glog:debug(string.format('%s', tostring(tIsVisible[i])))
+				if tIsVisible[i] then
+					--self.glog:debug(string.format('show: %d',i))
+					this_wnd:Show(true)
+				end
+			end
+		end
+	end
+end
 
 function Killroy:DumpIDs()
 	local result = {}
@@ -494,6 +534,7 @@ function Killroy:OnConfigure()
 	self.wndMain:FindChild("bShowAll"):SetCheck(self.tPrefs["bShowAll"])
 	self.wndMain:FindChild("bFormatChat"):SetCheck(self.tPrefs["bFormatChat"])
 	self.wndMain:FindChild("bShowMentions"):SetCheck(self.tPrefs["bShowMentions"])
+	self.wndMain:FindChild("bHideChatWindowsInCombat"):SetCheck(self.tPrefs["bHideChatWindwosInCombat"])
 	self.wndMain:FindChild("bRangeFilter"):SetCheck(self.tPrefs["bRangeFilter"])
 	self.wndMain:FindChild("bUseOcclusion"):SetCheck(self.tPrefs["bUseOcclusion"])
 	self.wndMain:FindChild("setEmoteColor"):SetBGColor(self.tPrefs["kstrEmoteColor"])
@@ -513,6 +554,20 @@ function Killroy:OnConfigure()
 	self.tRFBuffer["nFalloff"] = self.tPrefs["nFalloff"]
 	if self.strAliases then
 		self.wndMain:FindChild("Aliases"):SetText(self.strAliases)
+	end
+	
+	if self.tPrefs['nChatLabels'] == enum_ChatLabelsAbr then
+		self.wndMain:FindChild("optChatLabelAbr"):SetCheck(true)
+		self.wndMain:FindChild("optChatLabelExt"):SetCheck(false)
+		self.wndMain:FindChild("optChatLabelReg"):SetCheck(false)
+	elseif self.tPrefs['nChatLabels'] == enum_ChatLabelsExt then
+		self.wndMain:FindChild("optChatLabelExt"):SetCheck(true)
+		self.wndMain:FindChild("optChatLabelAbr"):SetCheck(false)
+		self.wndMain:FindChild("optChatLabelReg"):SetCheck(false)
+	else
+		self.wndMain:FindChild("optChatLabelReg"):SetCheck(true)
+		self.wndMain:FindChild("optChatLabelAbr"):SetCheck(false)
+		self.wndMain:FindChild("optChatLabelExt"):SetCheck(false)
 	end
 	
 	--ChatLog Options Override Section
@@ -576,6 +631,10 @@ function Killroy:OnRestore(eLevel, tData)
 		for i,v in pairs(tData.tPrefs) do
 			self.tPrefs[i] = v
 		end
+	end
+	
+	if not(self.tPrefs['nChatLabels']) then
+		self.tPrefs['nChatLabels'] = enum_ChatLabelsExt
 	end
 	
 	if tData.strAliases then
@@ -1166,14 +1225,14 @@ function Killroy:ParseForContext(strText, eChannelType)
 	
 	index = 1
 	for this_word in strLower:gmatch('%w+') do
-		self.glog:debug('this_word:'..this_word)
+		--self.glog:debug('this_word:'..this_word)
 		for i,this_mentiontest in ipairs(tMentionTests) do
-			self.glog:debug('this_mentiontest:'..this_mentiontest)
+			--self.glog:debug('this_mentiontest:'..this_mentiontest)
 			if this_mentiontest == this_word then
 				first,last = strLower:find(this_mentiontest, index)
 				mentions[first] = last
 				index = last + 1
-				self.glog:debug(string.format('first, last, index:%d, %d, %d', first, last, index))
+				--self.glog:debug(string.format('first, last, index:%d, %d, %d', first, last, index))
 			end
 		end
 	end
@@ -2707,6 +2766,10 @@ function Killroy:Change_HelperGenerateChatMessage()
 		local enum_RPOnly = 2
 		local enum_ShowAll = 3
 		
+		local enum_ChatLabelsAbr = 1
+		local enum_ChatLabelsReg = 2
+		local enum_ChatLabelsExt = 3 
+		
 		if tQueuedMessage.xml then
 			return
 		end
@@ -2815,12 +2878,20 @@ function Killroy:Change_HelperGenerateChatMessage()
 		else
 			local strChannel
 			if eChannelTypeOriginal == ChatSystemLib.ChatChannel_Society or eChannelTypeOriginal == ChatSystemLib.ChatChannel_Custom then
-				if Killroy.tPrefs['bChatLabelExt'] then
+				if Killroy.tPrefs['nChatLabels'] == enum_ChatLabelsExt then
+				--if Killroy.tPrefs['bChatLabelExt'] then
 					strChannel = (string.format("%s ", String_GetWeaselString(Apollo.GetString("ChatLog_GuildCommand"), tQueuedMessage.strChannelName, tQueuedMessage.strChannelCommand)))
 					 --String DB removed empty characters at the end of string, so have to hardcode it here.
+				elseif Killroy.tPrefs['nChatLabels'] == enum_ChatLabelsAbr then
+					strChannel = string.format("%s ", String_GetWeaselString(Apollo.GetString("CRB_Brackets_Space"), tQueuedMessage.strChannelCommand))
 				else
 					strChannel = string.format("%s ", String_GetWeaselString(Apollo.GetString("CRB_Brackets_Space"), tQueuedMessage.strChannelName))
 				end
+			elseif Killroy.tPrefs['nChatLabels'] == enum_ChatLabelsAbr then
+				local a_chan = Killroy:GetChannelByName(tQueuedMessage.strChannelName)
+				local strCommand = a_chan:GetAbbreviation()
+				--strChannel = string.format("%s ", String_GetWeaselString(Apollo.GetString("CRB_Brackets_Space"), tQueuedMessage.strChannelCommand))
+				strChannel = string.format("%s ", String_GetWeaselString(Apollo.GetString("CRB_Brackets_Space"), strCommand))
 			else
 				strChannel = String_GetWeaselString(Apollo.GetString("CRB_Brackets_Space"), tQueuedMessage.strChannelName)
 			end
@@ -3191,6 +3262,7 @@ function Killroy:OnOK()
 	self.tPrefs["bShowAll"] = (self.wndMain:FindChild("bShowAll"):IsChecked())
 	self.tPrefs["bFormatChat"] = (self.wndMain:FindChild("bFormatChat"):IsChecked())
 	self.tPrefs["bShowMentions"] = (self.wndMain:FindChild("bShowMentions"):IsChecked())
+	self.tPrefs["bHideChatWindowsInCombat"] = (self.wndMain:FindChild("bHideChatWindowsInCombat"):IsChecked())
 	self.tPrefs["bRangeFilter"] = (self.wndMain:FindChild("bRangeFilter"):IsChecked())
 	self.tPrefs["bUseOcclusion"] = (self.wndMain:FindChild("bUseOcclusion"):IsChecked())
 	self.tPrefs["bLegacy"] = (self.wndMain:FindChild("bLegacy"):IsChecked())
@@ -3207,6 +3279,14 @@ function Killroy:OnOK()
 	self.tPrefs["nMentionBlend"] = self.tBlendBuffer["nMentionBlend"]
 	self.strAliases = self.wndMain:FindChild("Aliases"):GetText()
 	self:ParseAliases()
+	
+	if self.wndMain:FindChild("optChatLabelAbr"):IsChecked() then
+		self.tPrefs['nChatLabels'] = enum_ChatLabelsAbr
+	elseif self.wndMain:FindChild("optChatLabelExt"):IsChecked() then
+		self.tPrefs['nChatLabels'] = enum_ChatLabelsExt
+	else
+		self.tPrefs['nChatLabels'] = enum_ChatLabelsReg
+	end
 	
 	--ChatLog Overrides
 	self.tChatLogPrefs["bProfanityFilter"] = self.wndMain:FindChild("bProfanityFilter"):IsChecked()
@@ -3244,6 +3324,7 @@ function Killroy:OnCancel()
 	self.wndMain:FindChild("bShowAll"):SetCheck(self.tPrefs["bShowAll"])
 	self.wndMain:FindChild("bFormatChat"):SetCheck(self.tPrefs["bFormat"])
 	self.wndMain:FindChild("bShowMentions"):SetCheck(self.tPrefs["bShowMentions"])
+	self.wndMain:FindChild("bHideChatWindowsInCombat"):SetCheck(self.tPrefs["bHideChatWindowsInCombat"])
 	self.wndMain:FindChild("bRangeFilter"):SetCheck(self.tPrefs["bRangeFilter"])
 	self.wndMain:FindChild("bUseOcclusion"):SetCheck(self.tPrefs["bUseOcclusion"])
 	self.wndMain:FindChild("bLegacy"):SetCheck(self.tPrefs["bLegacy"])
@@ -3259,6 +3340,21 @@ function Killroy:OnCancel()
 	self.tBlendBuffer["nOOCBlend"] = self.tPrefs["nOOCBlend"]
 	self.tBlendBuffer["nMentionBlend"] = self.tPrefs["nMentionBlend"]
 	self.wndMain:FindChild("Aliases"):SetText(self.strAliases)
+	
+	if self.tPrefs['nChatLabels'] == enum_ChatLabelsAbr then
+		self.wndMain:FindChild("optChatLabelAbr"):SetCheck(true)
+		self.wndMain:FindChild("optChatLabelExt"):SetCheck(false)
+		self.wndMain:FindChild("optChatLabelReg"):SetCheck(false)
+	elseif self.tPrefs['nChatLabels'] == enum_ChatLabelsExt then
+		self.wndMain:FindChild("optChatLabelExt"):SetCheck(true)
+		self.wndMain:FindChild("optChatLabelAbr"):SetCheck(false)
+		self.wndMain:FindChild("optChatLabelReg"):SetCheck(false)
+	else
+		self.wndMain:FindChild("optChatLabelReg"):SetCheck(true)
+		self.wndMain:FindChild("optChatLabelAbr"):SetCheck(false)
+		self.wndMain:FindChild("optChatLabelExt"):SetCheck(false)
+	end
+	
 	--ChatLog Overrides
 	self.wndMain:FindChild("bProfanityFilter"):SetCheck(self.tChatLogPrefs["bProfanityFilter"])
 	self:Override_ChatLog_ProfanityFilter()
