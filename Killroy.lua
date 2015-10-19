@@ -30,6 +30,7 @@ local GeminiColor
 --   https://github.com/NexusInstruments/1Version/wiki/OneVersion_ReportAddonInfo-event#suffix-list
 
 local Major, Minor, Patch, Suffix = 1, 8, 0, 0
+
 local KILLROY_CURRENT_VERSION = string.format("%d.%d.%d", Major, Minor, Patch)
 
 -----------------------------------------------------------------------------------------------
@@ -248,7 +249,7 @@ function Killroy:OnDocumentLoaded()
 	GeminiColor = Apollo.GetPackage("GeminiColor").tPackage
 	GeminiLogging = Apollo.GetPackage("Gemini:Logging-1.2").tPackage
 	self.glog = GeminiLogging:GetLogger({
-		level = GeminiLogging.FATAL,
+		level = GeminiLogging.DEBUG,
         pattern = "%d %n %c %l - %m",
         appender = "GeminiConsole"
     })
@@ -492,6 +493,7 @@ function Killroy:OnConfigure()
 	self.wndMain:FindChild("bRPOnly"):SetCheck(self.tPrefs["bRPOnly"])
 	self.wndMain:FindChild("bShowAll"):SetCheck(self.tPrefs["bShowAll"])
 	self.wndMain:FindChild("bFormatChat"):SetCheck(self.tPrefs["bFormatChat"])
+	self.wndMain:FindChild("bShowMentions"):SetCheck(self.tPrefs["bShowMentions"])
 	self.wndMain:FindChild("bRangeFilter"):SetCheck(self.tPrefs["bRangeFilter"])
 	self.wndMain:FindChild("bUseOcclusion"):SetCheck(self.tPrefs["bUseOcclusion"])
 	self.wndMain:FindChild("setEmoteColor"):SetBGColor(self.tPrefs["kstrEmoteColor"])
@@ -1151,12 +1153,28 @@ function Killroy:ParseForContext(strText, eChannelType)
 	table.insert(tMentionTests, firstName)
 	table.insert(tMentionTests, lastName)
 	
+	--[[
 	for i, this_mentiontest in ipairs(tMentionTests) do
 		index = 1
 		for this_mention in strLower:gmatch('%f[%a]'..this_mentiontest..'%f[%A]') do
 			first, last = strLower:find(this_mention, index, true)
 			mentions[first] = last
 			index = last + 1
+		end
+	end
+	]]--
+	
+	index = 1
+	for this_word in strLower:gmatch('%w+') do
+		self.glog:debug('this_word:'..this_word)
+		for i,this_mentiontest in ipairs(tMentionTests) do
+			self.glog:debug('this_mentiontest:'..this_mentiontest)
+			if this_mentiontest == this_word then
+				first,last = strLower:find(this_mentiontest, index)
+				mentions[first] = last
+				index = last + 1
+				self.glog:debug(string.format('first, last, index:%d, %d, %d', first, last, index))
+			end
 		end
 	end
 	
@@ -3172,6 +3190,7 @@ function Killroy:OnOK()
 	self.tPrefs["bRPOnly"] = (self.wndMain:FindChild("bRPOnly"):IsChecked())
 	self.tPrefs["bShowAll"] = (self.wndMain:FindChild("bShowAll"):IsChecked())
 	self.tPrefs["bFormatChat"] = (self.wndMain:FindChild("bFormatChat"):IsChecked())
+	self.tPrefs["bShowMentions"] = (self.wndMain:FindChild("bShowMentions"):IsChecked())
 	self.tPrefs["bRangeFilter"] = (self.wndMain:FindChild("bRangeFilter"):IsChecked())
 	self.tPrefs["bUseOcclusion"] = (self.wndMain:FindChild("bUseOcclusion"):IsChecked())
 	self.tPrefs["bLegacy"] = (self.wndMain:FindChild("bLegacy"):IsChecked())
@@ -3224,6 +3243,7 @@ function Killroy:OnCancel()
 	self.wndMain:FindChild("bRPOnly"):SetCheck(self.tPrefs["bRPOnly"])
 	self.wndMain:FindChild("bShowAll"):SetCheck(self.tPrefs["bShowAll"])
 	self.wndMain:FindChild("bFormatChat"):SetCheck(self.tPrefs["bFormat"])
+	self.wndMain:FindChild("bShowMentions"):SetCheck(self.tPrefs["bShowMentions"])
 	self.wndMain:FindChild("bRangeFilter"):SetCheck(self.tPrefs["bRangeFilter"])
 	self.wndMain:FindChild("bUseOcclusion"):SetCheck(self.tPrefs["bUseOcclusion"])
 	self.wndMain:FindChild("bLegacy"):SetCheck(self.tPrefs["bLegacy"])
