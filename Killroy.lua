@@ -248,7 +248,7 @@ function Killroy:OnDocumentLoaded()
 	GeminiColor = Apollo.GetPackage("GeminiColor").tPackage
 	GeminiLogging = Apollo.GetPackage("Gemini:Logging-1.2").tPackage
 	self.glog = GeminiLogging:GetLogger({
-		level = GeminiLogging.DEBUG,
+		level = GeminiLogging.FATAL,
         pattern = "%d %n %c %l - %m",
         appender = "GeminiConsole"
     })
