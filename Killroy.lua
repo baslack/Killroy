@@ -29,7 +29,7 @@ local GeminiColor
 -- for Suffix Numbers see:
 --   https://github.com/NexusInstruments/1Version/wiki/OneVersion_ReportAddonInfo-event#suffix-list
 
-local Major, Minor, Patch, Suffix = 1, 7, 1, 0
+local Major, Minor, Patch, Suffix = 1, 7, 2, 0
 local KILLROY_CURRENT_VERSION = string.format("%d.%d.%d", Major, Minor, Patch)
 
 -----------------------------------------------------------------------------------------------
@@ -144,6 +144,7 @@ function Killroy:new(o)
 			bFormatChat = true,
 			bRangeFilter = true,
 			bCustomChatColors = true,
+			bShowMentions = true,
 			nSayRange = knDefaultSayRange,
 			nEmoteRange = knDefaultEmoteRange,
 			nFalloff = knDefaultFalloff,
@@ -247,7 +248,7 @@ function Killroy:OnDocumentLoaded()
 	GeminiColor = Apollo.GetPackage("GeminiColor").tPackage
 	GeminiLogging = Apollo.GetPackage("Gemini:Logging-1.2").tPackage
 	self.glog = GeminiLogging:GetLogger({
-		level = GeminiLogging.FATAL,
+		level = GeminiLogging.DEBUG,
         pattern = "%d %n %c %l - %m",
         appender = "GeminiConsole"
     })
@@ -1150,6 +1151,7 @@ function Killroy:ParseForContext(strText, eChannelType)
 	table.insert(tMentionTests, firstName)
 	table.insert(tMentionTests, lastName)
 	
+	--[[
 	for i, this_mentiontest in ipairs(tMentionTests) do
 		index = 1
 		for this_mention in strLower:gmatch('%f[%a]'..this_mentiontest..'%f[%A]') do
@@ -1158,51 +1160,33 @@ function Killroy:ParseForContext(strText, eChannelType)
 			index = last + 1
 		end
 	end
-	
-	--[[ 
-	index = 1
-	for mention in strLower:gmatch(firstName) do
-		first, last = strLower:find(mention, index, true)
-		mentionsFirst[first] = last
-		index = last + 1
-	end
-
-	index = 1
-	for mention in strLower:gmatch(lastName ) do
-		first, last = strLower:find(mention, index, true)
-		mentionsLast[first] = last
-		index = last + 1
-	end
 	]]--
 	
-	--setting up parse to return dump
+	index = 1
+	for this_word in strLower:gmatch('%w+') do
+		self.glog:debug('this_word:'..this_word)
+		for i,this_mentiontest in ipairs(tMentionTests) do
+			self.glog:debug('this_mentiontest:'..this_mentiontest)
+			if this_mentiontest == this_word then
+				first,last = strLower:find(this_mentiontest, index)
+				mentions[first] = last
+				index = last + 1
+				self.glog:debug(string.format('first, last, index:%d, %d, %d', first, last, index))
+			end
+		end
+	end
+	
 	buffer = ""
 	index = 1
 
 	while index <= strText:len() do
-		if mentions[index] then
+		if mentions[index] and self.tPrefs['bShowMentions'] then
 			if buffer then
 				table.insert(parsedText, {buffer, tagByChan()})
 				buffer = ""
 			end
 			table.insert(parsedText, {strText:sub(index, mentions[index]), tagMention})
 			index = mentions[index] + 1
-		--[[
-		if mentionsFirst[index] then
-			if buffer then
-				table.insert(parsedText, {buffer, tagByChan()})
-				buffer = ""
-			end
-			table.insert(parsedText, {strText:sub(index, mentionsFirst[index]), tagMention})
-			index = mentionsFirst[index] + 1
-		elseif mentionsLast[index] then
-			if buffer then
-				table.insert(parsedText, {buffer, tagByChan()})
-				buffer = ""
-			end
-			table.insert(parsedText, {strText:sub(index, mentionsLast[index]), tagMention})
-			index = mentionsLast[index] + 1
-		]]--
 		elseif oocs[index] then
 			if buffer then
 				table.insert(parsedText, {buffer, tagByChan()})
