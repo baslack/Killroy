@@ -29,7 +29,7 @@ local GeminiColor
 -- for Suffix Numbers see:
 --   https://github.com/NexusInstruments/1Version/wiki/OneVersion_ReportAddonInfo-event#suffix-list
 
-local Major, Minor, Patch, Suffix = 1, 8, 0, 0
+local Major, Minor, Patch, Suffix = 1, 8, 1, 0
 
 local KILLROY_CURRENT_VERSION = string.format("%d.%d.%d", Major, Minor, Patch)
 
@@ -1042,13 +1042,16 @@ function Killroy:Command(...)
 			if sArgs then
 				--defaults
 				if sFlag == "-defaults" then
-					self.tPrefs = 
-									{
+					self.tPrefs = {
 										bCrossFaction = true,
 										bRPOnly = true,
+										bShowAll = false,
 										bFormatChat = true,
 										bRangeFilter = true,
 										bCustomChatColors = true,
+										bShowMentions = true,
+										bHideChatWindowsInCombat = false,
+										nChatLabels = enum_ChatLabelsExt,
 										nSayRange = knDefaultSayRange,
 										nEmoteRange = knDefaultEmoteRange,
 										nFalloff = knDefaultFalloff,
@@ -1062,7 +1065,11 @@ function Killroy:Command(...)
 										nOOCBlend = knDefaultOOCBlend,
 										nMentionBlend = knDefaultMentionBlend,
 										bLegacy = true,
-										sVersion = KILLROY_CURRENT_VERSION
+										sVersion = KILLROY_CURRENT_VERSION,
+										strFontOption = "CRB_Interface12",
+										strRPFontOption = "CRB_Interface12_I",
+										strBubbleFontOption = "CRB_Interface12",
+										strBubbleRPFontOption = "CRB_Interface12_I",
 									}
 					chanCommand = self:GetChannelByName("Command")
 					self:SetupRPChannels()
