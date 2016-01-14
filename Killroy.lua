@@ -29,7 +29,7 @@ local GeminiColor
 -- for Suffix Numbers see:
 --   https://github.com/NexusInstruments/1Version/wiki/OneVersion_ReportAddonInfo-event#suffix-list
 
-local Major, Minor, Patch, Suffix = 1, 8, 1, 0
+local Major, Minor, Patch, Suffix = 1, 8, 2, 0
 
 local KILLROY_CURRENT_VERSION = string.format("%d.%d.%d", Major, Minor, Patch)
 
@@ -255,6 +255,19 @@ end
 function Killroy:OnDocumentLoaded()
 	GeminiColor = Apollo.GetPackage("GeminiColor").tPackage
 	GeminiLogging = Apollo.GetPackage("Gemini:Logging-1.2").tPackage
+	GeminiHook = Apollo.GetPackage("Gemini:Hook-1.0").tPackage
+	
+	GeminiHook:Embed(self)
+	
+	--first attempts at hooking GetUniqueId so as to consolidate
+	--Killroy for compatibility
+	--Unfortunately, ChatChannelLib is not a "class"
+	--Nor are channel objects, being returned as immutate userdata
+	--More thought is required.
+	
+	--self:PostHook(ChatChannelLib, "GetUniqueId")
+	--self:PostHook(self:GetChannelByName("WSRP"), "GetUniqueId")
+	
 	self.glog = GeminiLogging:GetLogger({
 		level = GeminiLogging.FATAL,
         pattern = "%d %n %c %l - %m",
@@ -332,6 +345,10 @@ end
 -- Killroy Functions
 -----------------------------------------------------------------------------------------------
 -- Define general functions here
+
+function Killroy:GetUniqueId()
+	self.glog:debug("Posthook, GetUniqueId")
+end
 
 local tIsVisible = {}
 
@@ -3224,12 +3241,12 @@ function Killroy:Change_OnChatInputReturn()
 					
 					--channel aliases
 					if Killroy.tChannelAliases[nCludge] then
-						Killroy.glog:debug("into insert logic")
-						Killroy.glog:debug(nCludge)
+						--Killroy.glog:debug("into insert logic")
+						--Killroy.glog:debug(nCludge)
 						if Killroy.tChannelAliases[nCludge] ~= "" then
-							Killroy.glog:debug(Killroy.tChannelAliases[nCludge])
+							--Killroy.glog:debug(Killroy.tChannelAliases[nCludge])
 							tInput.strMessage = string.format("(%s) - ", Killroy.tChannelAliases[nCludge]) .. tInput.strMessage
-							Killroy.glog:debug(tInput.strMessage)
+							--Killroy.glog:debug(tInput.strMessage)
 						end
 					end
 
@@ -3609,23 +3626,23 @@ function Killroy:Append_OnChannelAliasChanged()
 	
 	ChatLog = Apollo.GetAddon("ChatLog")
 	if not ChatLog then return nil end
-	self.glog:debug("Event Handlers")
+	--self.glog:debug("Event Handlers")
 	Apollo.RegisterEventHandler("OnChannelAliasChanged", OnChannelAliasChanged, ChatLog)
 	--Apollo.RegisterEventHandler("EditBoxReturn", OnChannelAliasChanged, ChatLog)
 
 	function ChatLog:OnChannelAliasChanged( wndHandler, wndControl, strText )
 		Killroy = Apollo.GetAddon("Killroy")
 		if not(Killroy) then return nil end
-		Killroy.glog:debug("Event Fired")
+		--Killroy.glog:debug("Event Fired")
 
 		if wndControl:GetName() == 'strChannelAlias' then
-			Killroy.glog:debug("into logic")
+			--Killroy.glog:debug("into logic")
 			--update the alias table
 			--get the channel id from the chatline's data
 			wndChatType = wndControl:GetParent()
 			tData = wndChatType:GetData()
 			nChannel = tData['nCludge']
-			Killroy.glog:debug(nChannel)
+			--Killroy.glog:debug(nChannel)
 			--put the alias into a table that the input function can pull from
 			local strSanitized, index = "", 1
 			for this_word in strText:gmatch('%w+;') do
@@ -3636,7 +3653,7 @@ function Killroy:Append_OnChannelAliasChanged()
 				end
 				index = index + 1
 			end
-			Killroy.glog:debug(strSanitized)
+			--Killroy.glog:debug(strSanitized)
 			Killroy.tChannelAliases[nChannel] = strSanitized
 		end
 	end
