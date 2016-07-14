@@ -95,10 +95,12 @@ local karChannelTypeToColor = -- TODO Merge into one table like this
 	[ChatSystemLib.ChatChannel_Realm] 			= { Channel = "ChannelSupport", 		},
 	[ChatSystemLib.ChatChannel_Loot] 			= { Channel = "ChannelLoot", 			},
 	[ChatSystemLib.ChatChannel_PlayerPath] 		= { Channel = "ChannelGeneral", 		},
-	[ChatSystemLib.ChatChannel_Instance] 		= { Channel = "ChannelInstance", 			},
+	[ChatSystemLib.ChatChannel_Instance] 		= { Channel = "ChannelInstance", 		},
 	[ChatSystemLib.ChatChannel_WarParty] 		= { Channel = "ChannelWarParty",		},
 	[ChatSystemLib.ChatChannel_WarPartyOfficer] = { Channel = "ChannelWarPartyOfficer", },
-	[ChatSystemLib.ChatChannel_Advice] 			= { Channel = "ChannelAdvice", 			},
+	[ChatSystemLib.ChatChannel_Nexus] 			= { Channel = "ChannelNexus", 			},
+	[ChatSystemLib.ChatChannel_NexusFrench] 	= { Channel = "ChannelNexus", 			},
+	[ChatSystemLib.ChatChannel_NexusGerman] 	= { Channel = "ChannelNexus", 			},
 	[ChatSystemLib.ChatChannel_AccountWhisper] 	= { Channel = "ChannelAccountWisper", 	},
 }
 
