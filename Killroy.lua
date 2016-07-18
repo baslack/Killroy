@@ -1,3 +1,19 @@
+--[[
+Goals for 1.9 Branch:
+I. Cleanup
+	A. Remove methods that modify ChatLog interface
+		i. eye on compatibility with other addons
+		ii. move all Killroy settings to a single interface
+	B. Eliminate obsoleced code
+		i. RP Marker
+		ii. Cross Faction Chat 
+	C. Switch from explicit overrides of ChatLog methods to GeminiHook
+II. Profile Management
+	A. Translate existing settings into GeminiDB
+	B. Give users ability to copy settings between characters.
+	C. Give users ability to set a default 
+]]--
+
 -----------------------------------------------------------------------------------------------
 -- Client Lua Script for Killroy
 -- Open Source Licensing granted by Benjamin A. Slack, feel free to use, change or extend.
@@ -199,7 +215,6 @@ function Killroy:new(o)
 		self.arSocietyChannels = {}
 		self.tViewed = {}
 		self.tChannelAliases = {}
-		--self.strAliases = ""
 		
 	else
 		self.tColorBuffer = 
@@ -236,6 +251,8 @@ function Killroy:Init()
 	"ChatLog",
 	"Gemini:Logging-1.2",
 	"GeminiColor",
+	"Gemini:Hook-1.0",
+	"Gemini:DB-1.0"
 	}
     Apollo.RegisterAddon(self, bHasConfigureFunction, strConfigureButtonText, tDependencies)
 end
@@ -258,20 +275,59 @@ function Killroy:OnDocumentLoaded()
 	GeminiColor = Apollo.GetPackage("GeminiColor").tPackage
 	GeminiLogging = Apollo.GetPackage("Gemini:Logging-1.2").tPackage
 	GeminiHook = Apollo.GetPackage("Gemini:Hook-1.0").tPackage
+	GeminiDB = Apollo.GetPackage("Gemini:DB-1.0").tPackage
 	
-	GeminiHook:Embed(self)
+	defaults = {
+		profile = {
+			sVersion = KILLROY_CURRENT_VERSION,
+			tPrefs = {
+				bRangeFilter = true,
+				bShowMentions = true,
+				bHideChatWindowsInCombat = false,
+				nChatLabels = enum_ChatLabelsExt,
+				nSayRange = knDefaultSayRange,
+				nEmoteRange = knDefaultEmoteRange,
+				nFalloff = knDefaultFalloff,
+				bUseOcclusion = true,
+				kstrEmoteColor = ksDefaultEmoteColor,
+				kstrSayColor = ksDefaultSayColor,
+				kstrOOCColor 	= ksDefaultOOCColor,
+				kstrMentionColor = ksDefaultMentionColor,
+				nICBlend = knDefaultICBlend,
+				nEmoteBlend = knDefaultEmoteBlend,
+				nOOCBlend = knDefaultOOCBlend,
+				nMentionBlend = knDefaultMentionBlend,
+				bLegacy = true,
+				strFontOption = "CRB_Interface12",
+				strRPFontOption = "CRB_Interface12_I",
+				strBubbleFontOption = "CRB_Interface12",
+				strBubbleRPFontOption = "CRB_Interface12_I",
+			},
+			tColorBuffer = {
+					kstrEmoteColor = ksDefaultEmoteColor,
+					kstrSayColor = ksDefaultSayColor,
+					kstrOOCColor 	= ksDefaultOOCColor,
+					kstrMentionColor = ksDefaultMentionColor,
+				},
+			tRFBuffer = {
+				nSayRange = knDefaultSayRange,
+				nEmoteRange = knDefaultEmoteRange,
+				nFalloff = knDefaultFalloff,
+			},
+			tBlendBuffer = {
+				nICBlend = knDefaultICBlend,
+				nEmoteBlend = knDefaultEmoteBlend,
+				nOOCBlend = knDefaultOOCBlend,
+				nMentionBlend = knDefaultMentionBlend,
+			},
+		}
+	}
 	
-	--first attempts at hooking GetUniqueId so as to consolidate
-	--Killroy for compatibility
-	--Unfortunately, ChatChannelLib is not a "class"
-	--Nor are channel objects, being returned as immutate userdata
-	--More thought is required.
-	
-	--self:PostHook(ChatChannelLib, "GetUniqueId")
-	--self:PostHook(self:GetChannelByName("WSRP"), "GetUniqueId")
+	--setup the new preferences database
+	self.db = GeminiDB:New("KillroyDB", defaults, true)
 	
 	self.glog = GeminiLogging:GetLogger({
-		level = GeminiLogging.FATAL,
+		level = GeminiLogging.DEBUG,
         pattern = "%d %n %c %l - %m",
         appender = "GeminiConsole"
     })
@@ -304,37 +360,63 @@ function Killroy:OnDocumentLoaded()
 	Apollo.RegisterEventHandler("OnMentionBlend", OneMentionBlend, self)
 	Apollo.RegisterEventHandler("InterfaceMenuListHasLoaded", "OnInterfaceMenuListHasLoaded", self)
 	Apollo.RegisterEventHandler("ToggleKillroy", "OnKillroyOn", self)
+	-- not sure about this event, maybe remove
 	Apollo.RegisterEventHandler("ChatLeave", "OnChatLeave", self)
 	Apollo.RegisterEventHandler("UnitEnteredCombat", "OnUnitEnteredCombat", self)
 	
 	-- replace ChatLogFunctions
+	-- likely remove
 	self:Change_OnChatJoin()
+	-- will likely still need to replace this. Ideally we wouldn't though. Maybe a Posthook, to modify it's output?
 	self:Change_HelperGenerateChatMessage()
+	-- shouldn't need this with the marker code out
 	self:Change_OnChatInputReturn()
+	
 	self:Change_OnRoleplayBtn()
+	-- shouldn't need this, likely modify with a hook to catch the message first and discard on the filter test
 	self:Change_OnChatMessage()
+	-- shouldn't need this
 	self:Change_VerifyChannelVisibility()
+	-- or this
 	self:Change_AddChannelTypeToList()
+	-- this will need to be re-written for the new channel dialog
 	self:Append_OnChannelColorBtn()
+	-- keep in the new dialog for channel by channel formatting
 	self:Append_OnRPChannel()
+	-- depreciated
 	self:Append_OnRPFilterChanged()
+	-- keep in the new dialog for channel by channel
 	self:Append_OnChannelAliasChanged()
+	-- shouldn't need this
 	self:Change_OnViewCheck()
+	-- shouldn't need this
 	self:Change_NewChatWindow()
+	-- or this
 	self:Change_OnInputChanged()
+	-- or this
 	self:Change_OnInputMenuEntry()
+	-- or this
 	self:Change_BuildInputTypeMenu()
+	-- or this
 	self:Change_HelperRemoveChannelFromInputWindow()
+	-- or this
 	self:Change_HelperFindAViewedChannel()
+	-- or this
 	self:Change_OnSettings()
+	-- out
 	self:Change_OnConfigure()
+	-- maybe out
 	self:Change_OnChatLineFadeTimer()
+	-- out
 	self:Change_OnSuggestedMenuResult()
 	
 	--Timers
 	self.FixIdTimer = ApolloTimer.Create(1, true, "OnFixIdTimer", self)
+	-- will still need some variant of this
 	self.arChatColorTimer = ApolloTimer.Create(2, true, "arChatColor_Check", self)
+	-- should be able to disable this
 	self.ChatLogSettingsTimer = ApolloTimer.Create(3, true, "ChatLogSettings_Check", self)
+	-- should be able to disable this
 	self.ChatWindowsTimer = ApolloTimer.Create(3, true, "ChatWindows_Cleanup", self)
 
 
@@ -348,17 +430,13 @@ end
 -----------------------------------------------------------------------------------------------
 -- Define general functions here
 
-function Killroy:GetUniqueId()
-	self.glog:debug("Posthook, GetUniqueId")
-end
-
 local tIsVisible = {}
 
 function Killroy:OnUnitEnteredCombat(unit,bInCombat)
 	ChatLog = Apollo.GetAddon("ChatLog")
 	if not(ChatLog) then return nil end
 	
-	if self.tPrefs['bHideChatWindowsInCombat'] then
+	if self.db.profile.tPrefs['bHideChatWindowsInCombat'] then
 		strOut = '%s, in combat: %s'
 		--self.glog:debug(strOut:format(unit:GetName(), tostring(bInCombat)))
 		
@@ -399,6 +477,8 @@ function Killroy:OnInterfaceMenuListHasLoaded()
 	Event_FireGenericEvent("InterfaceMenuList_NewAddOn", "Killroy", {"ToggleKillroy", "", "KIL:small_icon"})
 end
 
+--disabled due to return of channel control to ChatLog
+--[[
 function Killroy:ChatWindows_Cleanup()
 	-- this function runs at the startup of Killroy after the ChatWindows in ChatLog have come online.
 	-- it should eliminate any Unique ID entries, replacing them with ChannelCludges
@@ -462,7 +542,10 @@ function Killroy:ChatWindows_Cleanup()
 		return nil
 	end
 end
+]]--
 
+--disabled due to return of ChatLog control
+--[[
 function Killroy:KillChatLogSettings_Check()
 	ChatLog = Apollo.GetAddon("ChatLog")
 	if not ChatLog then return nil end
@@ -474,6 +557,7 @@ function Killroy:KillChatLogSettings_Check()
 		self.KillChatLogSettingsTimer:Stop()
 	end
 end
+]]--
 
 function Killroy:arChatColor_Check()
 	--self.glog:debug('arChatColor_Check')
@@ -486,6 +570,8 @@ function Killroy:arChatColor_Check()
 	end
 end
 
+--disabled due to return of ChatLog control
+--[[
 function Killroy:ChatLogSettings_Check()
 	ChatLog = Apollo.GetAddon("ChatLog")
 	if not ChatLog then return nil end
@@ -498,6 +584,7 @@ function Killroy:ChatLogSettings_Check()
 		self.ChatLogSettingsTimer:Stop()
 	end
 end
+]]--
 
 function Killroy:Setup_FontFaces()
 		
@@ -548,40 +635,39 @@ function Killroy:Setup_FontFaces()
 end
 
 function Killroy:OnConfigure()
-	self.wndMain:FindChild("sVersion"):SetText(self.tPrefs["sVersion"])
-	--self.wndMain:FindChild("bChatLabelExt"):SetCheck(self.tPrefs["bChatLabelExt"])
-	self.wndMain:FindChild("bCrossFaction"):SetCheck(self.tPrefs["bCrossFaction"])
-	self.wndMain:FindChild("bRPOnly"):SetCheck(self.tPrefs["bRPOnly"])
-	self.wndMain:FindChild("bShowAll"):SetCheck(self.tPrefs["bShowAll"])
-	self.wndMain:FindChild("bFormatChat"):SetCheck(self.tPrefs["bFormatChat"])
-	self.wndMain:FindChild("bShowMentions"):SetCheck(self.tPrefs["bShowMentions"])
-	self.wndMain:FindChild("bHideChatWindowsInCombat"):SetCheck(self.tPrefs["bHideChatWindowsInCombat"])
-	self.wndMain:FindChild("bRangeFilter"):SetCheck(self.tPrefs["bRangeFilter"])
-	self.wndMain:FindChild("bUseOcclusion"):SetCheck(self.tPrefs["bUseOcclusion"])
-	self.wndMain:FindChild("setEmoteColor"):SetBGColor(self.tPrefs["kstrEmoteColor"])
-	self.wndMain:FindChild("bLegacy"):SetCheck(self.tPrefs["bLegacy"])
-	self.wndMain:FindChild("nEmoteBlend"):SetValue(self.tPrefs["nEmoteBlend"])
-	self.wndMain:FindChild("setSayColor"):SetBGColor(self.tPrefs["kstrSayColor"])
-	self.wndMain:FindChild("nICBlend"):SetValue(self.tPrefs["nICBlend"])
-	self.wndMain:FindChild("setOOCColor"):SetBGColor(self.tPrefs["kstrOOCColor"])
-	self.wndMain:FindChild("setMentionColor"):SetBGColor(self.tPrefs["kstrMentionColor"])
-	self.wndMain:FindChild("nOOCBlend"):SetValue(self.tPrefs["nOOCBlend"])
-	self.wndMain:FindChild("nMentionBlend"):SetValue(self.tPrefs["nMentionBlend"])
-	self.wndMain:FindChild("nSayRange"):SetValue(self.tPrefs["nSayRange"])
-	self.tRFBuffer["nSayRange"] = self.tPrefs["nSayRange"]
-	self.wndMain:FindChild("nEmoteRange"):SetValue(self.tPrefs["nEmoteRange"])
-	self.tRFBuffer["nEmoteRange"] = self.tPrefs["nEmoteRange"]
-	self.wndMain:FindChild("nFalloff"):SetValue(self.tPrefs["nFalloff"])
-	self.tRFBuffer["nFalloff"] = self.tPrefs["nFalloff"]
-	if self.strAliases then
-		self.wndMain:FindChild("Aliases"):SetText(self.strAliases)
+	self.wndMain:FindChild("sVersion"):SetText(self.db.profile.sVersion)
+	--self.wndMain:FindChild("bCrossFaction"):SetCheck(self.tPrefs["bCrossFaction"])
+	--self.wndMain:FindChild("bRPOnly"):SetCheck(self.tPrefs["bRPOnly"])
+	--self.wndMain:FindChild("bShowAll"):SetCheck(self.tPrefs["bShowAll"])
+	--self.wndMain:FindChild("bFormatChat"):SetCheck(self.tPrefs["bFormatChat"])
+	self.wndMain:FindChild("bShowMentions"):SetCheck(self.db.profile.tPrefs["bShowMentions"])
+	self.wndMain:FindChild("bHideChatWindowsInCombat"):SetCheck(self.db.profile.tPrefs["bHideChatWindowsInCombat"])
+	self.wndMain:FindChild("bRangeFilter"):SetCheck(self.db.profile.tPrefs["bRangeFilter"])
+	self.wndMain:FindChild("bUseOcclusion"):SetCheck(self.db.profile.tPrefs["bUseOcclusion"])
+	self.wndMain:FindChild("setEmoteColor"):SetBGColor(self.db.profile.tPrefs["kstrEmoteColor"])
+	self.wndMain:FindChild("bLegacy"):SetCheck(self.db.profile.tPrefs["bLegacy"])
+	self.wndMain:FindChild("nEmoteBlend"):SetValue(self.db.profile.tPrefs["nEmoteBlend"])
+	self.wndMain:FindChild("setSayColor"):SetBGColor(self.db.profile.tPrefs["kstrSayColor"])
+	self.wndMain:FindChild("nICBlend"):SetValue(self.db.profile.tPrefs["nICBlend"])
+	self.wndMain:FindChild("setOOCColor"):SetBGColor(self.db.profile.tPrefs["kstrOOCColor"])
+	self.wndMain:FindChild("setMentionColor"):SetBGColor(self.db.profile.tPrefs["kstrMentionColor"])
+	self.wndMain:FindChild("nOOCBlend"):SetValue(self.db.profile.tPrefs["nOOCBlend"])
+	self.wndMain:FindChild("nMentionBlend"):SetValue(self.db.profile.tPrefs["nMentionBlend"])
+	self.wndMain:FindChild("nSayRange"):SetValue(self.db.profile.tPrefs["nSayRange"])
+	self.tRFBuffer["nSayRange"] = self.db.profile.tPrefs["nSayRange"]
+	self.wndMain:FindChild("nEmoteRange"):SetValue(self.db.profile.tPrefs["nEmoteRange"])
+	self.tRFBuffer["nEmoteRange"] = self.db.profile.tPrefs["nEmoteRange"]
+	self.wndMain:FindChild("nFalloff"):SetValue(self.db.profile.tPrefs["nFalloff"])
+	self.tRFBuffer["nFalloff"] = self.db.profile.tPrefs["nFalloff"]
+	if self.profile.db.strAliases then
+		self.wndMain:FindChild("Aliases"):SetText(self.profile.db.strAliases)
 	end
 	
-	if self.tPrefs['nChatLabels'] == enum_ChatLabelsAbr then
+	if self.db.profile.tPrefs['nChatLabels'] == enum_ChatLabelsAbr then
 		self.wndMain:FindChild("optChatLabelAbr"):SetCheck(true)
 		self.wndMain:FindChild("optChatLabelExt"):SetCheck(false)
 		self.wndMain:FindChild("optChatLabelReg"):SetCheck(false)
-	elseif self.tPrefs['nChatLabels'] == enum_ChatLabelsExt then
+	elseif self.db.profile.tPrefs['nChatLabels'] == enum_ChatLabelsExt then
 		self.wndMain:FindChild("optChatLabelExt"):SetCheck(true)
 		self.wndMain:FindChild("optChatLabelAbr"):SetCheck(false)
 		self.wndMain:FindChild("optChatLabelReg"):SetCheck(false)
@@ -591,6 +677,7 @@ function Killroy:OnConfigure()
 		self.wndMain:FindChild("optChatLabelExt"):SetCheck(false)
 	end
 	
+	--[[ depreciated
 	--ChatLog Options Override Section
 	self.wndMain:FindChild("bProfanityFilter"):SetCheck(self.tChatLogPrefs["bProfanityFilter"])
 	self.wndMain:FindChild("bTimestamp"):SetCheck(self.tChatLogPrefs["bShowTimestamp"])
@@ -600,6 +687,7 @@ function Killroy:OnConfigure()
 	self.wndMain:FindChild("nOpacity"):SetValue(self.tChatLogPrefs["nBGOpacity"])
 	self.wndMain:FindChild("bPCBubbles"):SetCheck(self.tChatLogPrefs["bPCBubbles"])
 	self.wndMain:FindChild("bNPCBubbles"):SetCheck(self.tChatLogPrefs["bNPCBubbles"])
+	]]--
 	
 	--Font Selected Setup
 	local cntrls = {}
@@ -607,9 +695,9 @@ function Killroy:OnConfigure()
 	
 	for i, this_optn in pairs(optns) do
 		cntrls[this_optn] = self.wndMain:FindChild(this_optn)
-		cntrls[this_optn]:SetText(self.tPrefs[this_optn])
-		cntrls[this_optn]:SetFont(self.tPrefs[this_optn])
-		cntrls[this_optn]:SetData(self.tPrefs[this_optn])
+		cntrls[this_optn]:SetText(self.db.profile.tPrefs[this_optn])
+		cntrls[this_optn]:SetFont(self.db.profile.tPrefs[this_optn])
+		cntrls[this_optn]:SetData(self.db.profile.tPrefs[this_optn])
 	end
 			
 	self.wndMain:Show(true)
@@ -620,9 +708,13 @@ function Killroy:OnKillroyOn()
 end
 
 function Killroy:GetPreferences()
-	return self.tPrefs
+	return self.db.profile.tPrefs
 end
 
+--TODO: 07.17.2016 Incorporating GeminiDB, performing cleanup and commenting out old code
+
+--disabled for GeminiDB
+--[[
 function Killroy:OnSave(eLevel)
 	if (eLevel == GameLib.CodeEnumAddonSaveLevel.Account) then
 		return {
@@ -651,7 +743,10 @@ function Killroy:OnSave(eLevel)
 		return nil
 	end
 end
+]]--
 
+-- disabled for GeminiDB
+--[[
 function Killroy:OnRestore(eLevel, tData)
 	--Killroy"s Prefs
 	if (tData.tPrefs ~= nil) then
@@ -723,15 +818,20 @@ function Killroy:OnRestore(eLevel, tData)
 	
 	self.bRestored = true
 end
+]]--
 
 ----------------------------
 --Killroy Specific Functions
 ----------------------------
 
+--[[
 function Killroy:OnFixIdTimer()
 	self:FixChannelIds()
 	self.FixIdTimer:Stop()
 end
+]]--
+
+--[[ depreciated, due to return of ChatLog control
 
 function Killroy:FixChannelIds()
 	--self.glog:debug('FixChannelIds()')
@@ -779,7 +879,9 @@ function Killroy:FixChannelIds()
 		end
 	end
 end
+]]--
 
+--[[ depreciated
 function Killroy:DumpChannelNames()
 	for idx, this_chan in ipairs(ChatSystemLib.GetChannels()) do
 		local nType = self:ChannelCludge(this_chan:GetName(), this_chan:GetType())
@@ -787,6 +889,7 @@ function Killroy:DumpChannelNames()
 		Print(string.format("%s:%i", sName, nType))
 	end
 end
+]]--
 
 function Killroy:SetupRPChannels()
 	local channels = ChatSystemLib.GetChannels()
