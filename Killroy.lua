@@ -29,7 +29,7 @@ local GeminiColor
 -- for Suffix Numbers see:
 --   https://github.com/NexusInstruments/1Version/wiki/OneVersion_ReportAddonInfo-event#suffix-list
 
-local Major, Minor, Patch, Suffix = 1, 8, 2, 0
+local Major, Minor, Patch, Suffix = 1, 8, 3, 0
 
 local KILLROY_CURRENT_VERSION = string.format("%d.%d.%d", Major, Minor, Patch)
 
