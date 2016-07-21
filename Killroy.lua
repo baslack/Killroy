@@ -52,76 +52,6 @@ local KILLROY_CURRENT_VERSION = string.format("%d.%d.%d", Major, Minor, Patch)
 -----------------------------------------------------------------------------------------------
 -- Constants
 -----------------------------------------------------------------------------------------------
--- e.g. local kiExampleVariableMax = 999
-
-local kcrInvalidColor = ApolloColor.new("InvalidChat")
-local kcrValidColor = ApolloColor.new("white")
-
-local knCountSpaces = 2
-local kstrColorChatRegular = "ff7fffb9"
-local kstrColorChatShout = "ffd9eef7"
-local kstrColorChatRoleplay = "ff58e3b0"
-local kstrColorNonSelectedEntry = "UI_BtnTextHoloNormal"
-local kstrBubbleFont = "CRB_Dialog"
-local kstrDialogFont = "CRB_Dialog"
-local kstrDialogFontRP = "CRB_Dialog_I"
-
-local kstrGMIcon = "Icon_Windows_UI_GMIcon"
-
-local knChannelListHeight = 500
-
-local knSaveVersion = 8
-local knMaxRecentEntries = 10
-local kMaxShownEntries = 4
-
-local karEvalColors =
-{
-	[Item.CodeEnumItemQuality.Inferior] 		= "ItemQuality_Inferior",
-	[Item.CodeEnumItemQuality.Average] 			= "ItemQuality_Average",
-	[Item.CodeEnumItemQuality.Good] 			= "ItemQuality_Good",
-	[Item.CodeEnumItemQuality.Excellent] 		= "ItemQuality_Excellent",
-	[Item.CodeEnumItemQuality.Superb] 			= "ItemQuality_Superb",
-	[Item.CodeEnumItemQuality.Legendary] 		= "ItemQuality_Legendary",
-	[Item.CodeEnumItemQuality.Artifact]		 	= "ItemQuality_Artifact",
-}
-
-local karChannelTypeToColor = -- TODO Merge into one table like this
-{
-	[ChatSystemLib.ChatChannel_Command] 		= { Channel = "ChannelCommand", 		},
-	[ChatSystemLib.ChatChannel_System] 			= { Channel = "ChannelSystem", 			},
-	[ChatSystemLib.ChatChannel_Debug] 			= { Channel = "ChannelDebug", 			},
-	[ChatSystemLib.ChatChannel_Say] 			= { Channel = "ChannelSay", 			},
-	[ChatSystemLib.ChatChannel_Yell] 			= { Channel = "ChannelShout", 			},
-	[ChatSystemLib.ChatChannel_Whisper] 		= { Channel = "ChannelWhisper", 		},
-	[ChatSystemLib.ChatChannel_Party] 			= { Channel = "ChannelParty", 			},
-	[ChatSystemLib.ChatChannel_Emote] 			= { Channel = "ChannelEmote", 			},
-	[ChatSystemLib.ChatChannel_AnimatedEmote] 	= { Channel = "ChannelEmote", 			},
-	[ChatSystemLib.ChatChannel_Zone] 			= { Channel = "ChannelZone", 			},
-	[ChatSystemLib.ChatChannel_ZonePvP] 		= { Channel = "ChannelPvP", 			},
-	[ChatSystemLib.ChatChannel_Trade] 			= { Channel = "ChannelTrade",			},
-	[ChatSystemLib.ChatChannel_Guild] 			= { Channel = "ChannelGuild", 			},
-	[ChatSystemLib.ChatChannel_GuildOfficer] 	= { Channel = "ChannelGuildOfficer",	},
-	[ChatSystemLib.ChatChannel_Society] 		= { Channel = "ChannelCircle2",			},
-	[ChatSystemLib.ChatChannel_Custom] 			= { Channel = "ChannelCustom", 			},
-	[ChatSystemLib.ChatChannel_NPCSay] 			= { Channel = "ChannelNPC", 			},
-	[ChatSystemLib.ChatChannel_NPCYell] 		= { Channel = "ChannelNPC",		 		},
-	[ChatSystemLib.ChatChannel_NPCWhisper]		= { Channel = "ChannelNPC", 			},
-	[ChatSystemLib.ChatChannel_Datachron] 		= { Channel = "ChannelNPC", 			},
-	[ChatSystemLib.ChatChannel_Combat] 			= { Channel = "ChannelGeneral", 		},
-	[ChatSystemLib.ChatChannel_Realm] 			= { Channel = "ChannelSupport", 		},
-	[ChatSystemLib.ChatChannel_Loot] 			= { Channel = "ChannelLoot", 			},
-	[ChatSystemLib.ChatChannel_PlayerPath] 		= { Channel = "ChannelGeneral", 		},
-	[ChatSystemLib.ChatChannel_Instance] 		= { Channel = "ChannelInstance", 		},
-	[ChatSystemLib.ChatChannel_WarParty] 		= { Channel = "ChannelWarParty",		},
-	[ChatSystemLib.ChatChannel_WarPartyOfficer] = { Channel = "ChannelWarPartyOfficer", },
-	[ChatSystemLib.ChatChannel_Nexus] 			= { Channel = "ChannelNexus", 			},
-	[ChatSystemLib.ChatChannel_NexusFrench] 	= { Channel = "ChannelNexus", 			},
-	[ChatSystemLib.ChatChannel_NexusGerman] 	= { Channel = "ChannelNexus", 			},
-	[ChatSystemLib.ChatChannel_AccountWhisper] 	= { Channel = "ChannelAccountWisper", 	},
-}
-
-local ktDefaultHolds = {}
-ktDefaultHolds[ChatSystemLib.ChatChannel_Whisper] = true
 
 local tagEmo = 101
 local tagSay = 102
@@ -157,6 +87,7 @@ function Killroy:new(o)
     self.__index = self 
 
     -- initialize variables here
+	--[[depreciated prefs, moved into db
 	if not(self.tPrefs) then
 		self.tPrefs = 
 		{
@@ -240,7 +171,7 @@ function Killroy:new(o)
 	
 	-- global state for skipping the next animated emote
 	self.bSkipAnimatedEmote = false
-
+	]]--
     return o
 end
 
@@ -303,6 +234,7 @@ function Killroy:OnDocumentLoaded()
 				strRPFontOption = "CRB_Interface12_I",
 				strBubbleFontOption = "CRB_Interface12",
 				strBubbleRPFontOption = "CRB_Interface12_I",
+				strAliases = "",
 			},
 			tColorBuffer = {
 					kstrEmoteColor = ksDefaultEmoteColor,
@@ -322,6 +254,8 @@ function Killroy:OnDocumentLoaded()
 				nMentionBlend = knDefaultMentionBlend,
 			},
 			tRPChannels = {
+			"Say",
+			"Emote",
 			},
 			tAliases = {
 			},
@@ -329,7 +263,9 @@ function Killroy:OnDocumentLoaded()
 	}
 	
 	--setup the new preferences database
-	self.db = GeminiDB:New("KillroyDB", defaults, true)
+	if not self.db then
+		self.db = GeminiDB:New("KillroyDB", defaults, true)
+	end
 	
 	self.glog = GeminiLogging:GetLogger({
 		level = GeminiLogging.DEBUG,
@@ -341,20 +277,21 @@ function Killroy:OnDocumentLoaded()
 	self.wndMain:Show(false, true)
 	self:Setup_FontFaces()
 	
+	--[[
 	self.wndWarn = Apollo.LoadForm(self.xmlDoc, "Warning", nil, self)
 	self.wndWarn:Show(false)
+	]]--
 	
 	-- if this hasn't been restored, set it to the default
-	if not(self.strAliases) then
-		--Apollo.AddAddonErrorText(self.wndMain:FindChild("Aliases"):GetText())
-		self.strAliases = self.wndMain:FindChild("Aliases"):GetText()
+	if self.db.profile.tPrefs['strAliases'] then
+		self:ParseAliases()
 	end
-	self:ParseAliases()
 
 	--register commands and actions
 	Apollo.RegisterSlashCommand("killroy", "OnKillroyOn", self)
 	Apollo.RegisterSlashCommand("klabout", "KillroyAbout", self)
-	Apollo.RegisterSlashCommand("kl", "Command", self)
+	--disabled for time being
+	--Apollo.RegisterSlashCommand("kl", "Command", self)
 	Apollo.RegisterEventHandler("OnSetEmoteColor", OnSetEmoteColor, self)
 	Apollo.RegisterEventHandler("OnSetSayColor", OnSetSayColor, self)
 	Apollo.RegisterEventHandler("OnSetOOCColor", OnSetOOCColor, self)
@@ -366,9 +303,10 @@ function Killroy:OnDocumentLoaded()
 	Apollo.RegisterEventHandler("InterfaceMenuListHasLoaded", "OnInterfaceMenuListHasLoaded", self)
 	Apollo.RegisterEventHandler("ToggleKillroy", "OnKillroyOn", self)
 	-- not sure about this event, maybe remove
-	Apollo.RegisterEventHandler("ChatLeave", "OnChatLeave", self)
+	-- Apollo.RegisterEventHandler("ChatLeave", "OnChatLeave", self)
 	Apollo.RegisterEventHandler("UnitEnteredCombat", "OnUnitEnteredCombat", self)
 	
+	--[[
 	-- replace ChatLogFunctions
 	-- likely remove
 	self:Change_OnChatJoin()
@@ -377,7 +315,7 @@ function Killroy:OnDocumentLoaded()
 	-- shouldn't need this with the marker code out
 	self:Change_OnChatInputReturn()
 	
-	self:Change_OnRoleplayBtn()
+	-- self:Change_OnRoleplayBtn()
 	-- shouldn't need this, likely modify with a hook to catch the message first and discard on the filter test
 	self:Change_OnChatMessage()
 	-- shouldn't need this
@@ -414,15 +352,16 @@ function Killroy:OnDocumentLoaded()
 	self:Change_OnChatLineFadeTimer()
 	-- out
 	self:Change_OnSuggestedMenuResult()
+	]]--
 	
 	--Timers
-	self.FixIdTimer = ApolloTimer.Create(1, true, "OnFixIdTimer", self)
+	-- self.FixIdTimer = ApolloTimer.Create(1, true, "OnFixIdTimer", self)
 	-- will still need some variant of this
-	self.arChatColorTimer = ApolloTimer.Create(2, true, "arChatColor_Check", self)
+	-- self.arChatColorTimer = ApolloTimer.Create(2, true, "arChatColor_Check", self)
 	-- should be able to disable this
-	self.ChatLogSettingsTimer = ApolloTimer.Create(3, true, "ChatLogSettings_Check", self)
+	-- self.ChatLogSettingsTimer = ApolloTimer.Create(3, true, "ChatLogSettings_Check", self)
 	-- should be able to disable this
-	self.ChatWindowsTimer = ApolloTimer.Create(3, true, "ChatWindows_Cleanup", self)
+	-- self.ChatWindowsTimer = ApolloTimer.Create(3, true, "ChatWindows_Cleanup", self)
 
 
 	if table.maxn(self.arRPChannels) == 0 then
