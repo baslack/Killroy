@@ -1,0 +1,10 @@
+package-as: Killroy
+enable-nolib-creation: no
+
+externals:
+    GeminiColor:
+        url: https://github.com/wildstarnasa/GeminiColor.git
+    GeminiHook:
+        url: https://github.com/wildstarnasa/GeminiHook.git
+    GeminiLogging:
+        url: https://github.com/wildstarnasa/GeminiLogging.git
