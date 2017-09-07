@@ -1,7 +1,7 @@
 Killroy
 =======
 
-Current Release: 1.8.4 
+Current Release: 1.8.4.1 
 compatible with [OneVersion](http://www.curse.com/ws-addons/wildstar/231062-oneversion)
 
 [Manual available here!](http://www.wildstar-roleplay.com/forum/m/11410152/viewthread/16453255-documentation-killroy-manual/page/1)
